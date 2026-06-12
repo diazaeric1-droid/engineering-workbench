@@ -1,0 +1,130 @@
+{
+  "well_id": "ED-009H",
+  "api_number": "42-109-10009",
+  "field": "Permian conventional (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2015-03-01",
+  "first_prod_date": "2015-06-01",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "San Andres"
+  },
+  "artificial_lift": {
+    "type": "Beam Pump",
+    "installed_date": "2019-04-10",
+    "pump_spec": {
+      "model": "C-228D-200-74",
+      "stroke_in": 74,
+      "spm": 6.5,
+      "plunger_in": 1.75
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 121.6,
+      "water_bwpd": 63.3,
+      "gas_mcfd": 217.1
+    },
+    {
+      "day": 60,
+      "oil_bopd": 124.7,
+      "water_bwpd": 67.4,
+      "gas_mcfd": 220.8
+    },
+    {
+      "day": 90,
+      "oil_bopd": 117.8,
+      "water_bwpd": 66.0,
+      "gas_mcfd": 206.8
+    },
+    {
+      "day": 120,
+      "oil_bopd": 105.5,
+      "water_bwpd": 61.2,
+      "gas_mcfd": 183.5
+    },
+    {
+      "day": 180,
+      "oil_bopd": 122.1,
+      "water_bwpd": 75.7,
+      "gas_mcfd": 208.9
+    },
+    {
+      "day": 240,
+      "oil_bopd": 105.4,
+      "water_bwpd": 69.6,
+      "gas_mcfd": 177.1
+    },
+    {
+      "day": 300,
+      "oil_bopd": 92.7,
+      "water_bwpd": 64.9,
+      "gas_mcfd": 153.0
+    },
+    {
+      "day": 365,
+      "oil_bopd": 104.7,
+      "water_bwpd": 77.8,
+      "gas_mcfd": 169.3
+    },
+    {
+      "day": 450,
+      "oil_bopd": 85.9,
+      "water_bwpd": 68.7,
+      "gas_mcfd": 135.3
+    },
+    {
+      "day": 540,
+      "oil_bopd": 78.5,
+      "water_bwpd": 67.5,
+      "gas_mcfd": 120.0
+    },
+    {
+      "day": 630,
+      "oil_bopd": 74.5,
+      "water_bwpd": 68.5,
+      "gas_mcfd": 110.6
+    },
+    {
+      "day": 720,
+      "oil_bopd": 74.1,
+      "water_bwpd": 72.6,
+      "gas_mcfd": 106.7
+    },
+    {
+      "day": 810,
+      "oil_bopd": 64.9,
+      "water_bwpd": 67.5,
+      "gas_mcfd": 90.5
+    },
+    {
+      "day": 900,
+      "oil_bopd": 60.5,
+      "water_bwpd": 66.5,
+      "gas_mcfd": 81.6
+    },
+    {
+      "day": 990,
+      "oil_bopd": 57.0,
+      "water_bwpd": 66.2,
+      "gas_mcfd": 74.4
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [
+    {
+      "date": "2026-05-25",
+      "pattern": "Incomplete fillage, sharp load drop on the downstroke.",
+      "fillage_pct": 60
+    }
+  ],
+  "notes": [
+    "Pumping-unit cycle counter trending up over the last month.",
+    "Operator requested a surveillance review."
+  ]
+}

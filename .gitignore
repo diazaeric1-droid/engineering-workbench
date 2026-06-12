@@ -1,0 +1,39 @@
+# environment / caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.env
+.streamlit/secrets.toml
+
+# ---- regenerated component artifacts (bootstrap rebuilds them; mirrors each
+# component's own .gitignore, re-rooted under apps/) ----
+
+# esp-failure-risk-agent: synthetic SCADA + trained model artifacts
+apps/esp-failure-risk-agent/artifacts/
+apps/esp-failure-risk-agent/data/synthetic/*.csv
+apps/esp-failure-risk-agent/data/synthetic/labels.csv
+
+# well-gas-lift-advisor: generated fleet + ground truth + eval output
+apps/well-gas-lift-advisor/data/synthetic/fleet/
+apps/well-gas-lift-advisor/data/synthetic/ground_truth.csv
+apps/well-gas-lift-advisor/evals/optimization_report.json
+
+# production-engineer-copilot: user-supplied NDIC extract + eval scratch.
+# (its synthetic JSONs + the real Colorado CSV are COMMITTED, exactly as upstream;
+# the four scored eval summaries stay committed — the honest-eval chip reads them.
+# `results/*` + negations rather than `results/` so the re-includes can take effect.)
+apps/production-engineer-copilot/data/real/ndic/production.csv
+apps/production-engineer-copilot/evals/results/*
+!apps/production-engineer-copilot/evals/results/summary.json
+!apps/production-engineer-copilot/evals/results/model_frontier.json
+!apps/production-engineer-copilot/evals/results/adversarial.txt
+!apps/production-engineer-copilot/evals/results/holdout
+apps/production-engineer-copilot/evals/results/holdout/*
+!apps/production-engineer-copilot/evals/results/holdout/summary_holdout.json

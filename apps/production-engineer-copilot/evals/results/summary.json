@@ -1,0 +1,413 @@
+[
+  {
+    "id": "case_001",
+    "notes": "acid_stim_candidate",
+    "lift": "ESP",
+    "archetype": "acid_stim_candidate",
+    "expected": "acid stimulation",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_002",
+    "notes": "acid_stim_candidate",
+    "lift": "ESP",
+    "archetype": "acid_stim_candidate",
+    "expected": "acid stimulation",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_003",
+    "notes": "esp_below_por",
+    "lift": "ESP",
+    "archetype": "esp_below_por",
+    "expected": "esp swap",
+    "predicted": "esp_swap",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_004",
+    "notes": "esp_below_por",
+    "lift": "ESP",
+    "archetype": "esp_below_por",
+    "expected": "esp swap",
+    "predicted": "esp_swap",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_005",
+    "notes": "esp_below_por",
+    "lift": "ESP",
+    "archetype": "esp_below_por",
+    "expected": "esp swap",
+    "predicted": "esp_swap",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_006",
+    "notes": "esp_below_por",
+    "lift": "ESP",
+    "archetype": "esp_below_por",
+    "expected": "esp swap",
+    "predicted": "esp_swap",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_007",
+    "notes": "esp_gas_interference",
+    "lift": "ESP",
+    "archetype": "esp_gas_interference",
+    "expected": "gas separator",
+    "predicted": "gas_separator",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_008",
+    "notes": "esp_gas_interference",
+    "lift": "ESP",
+    "archetype": "esp_gas_interference",
+    "expected": "gas separator",
+    "predicted": "gas_separator",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_009",
+    "notes": "esp_gas_interference",
+    "lift": "ESP",
+    "archetype": "esp_gas_interference",
+    "expected": "gas separator",
+    "predicted": "esp_swap",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_010",
+    "notes": "esp_gas_interference",
+    "lift": "ESP",
+    "archetype": "esp_gas_interference",
+    "expected": "gas separator",
+    "predicted": "gas_separator",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_011",
+    "notes": "esp_scale",
+    "lift": "ESP",
+    "archetype": "esp_scale",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_012",
+    "notes": "esp_scale",
+    "lift": "ESP",
+    "archetype": "esp_scale",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_013",
+    "notes": "esp_scale",
+    "lift": "ESP",
+    "archetype": "esp_scale",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_014",
+    "notes": "esp_normal",
+    "lift": "ESP",
+    "archetype": "esp_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_015",
+    "notes": "esp_normal",
+    "lift": "ESP",
+    "archetype": "esp_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_016",
+    "notes": "esp_normal",
+    "lift": "ESP",
+    "archetype": "esp_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_017",
+    "notes": "esp_to_beam_candidate",
+    "lift": "ESP",
+    "archetype": "esp_to_beam_candidate",
+    "expected": "esp-to-beam conversion",
+    "predicted": "esp-to-beam_conversion",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_018",
+    "notes": "esp_to_beam_candidate",
+    "lift": "ESP",
+    "archetype": "esp_to_beam_candidate",
+    "expected": "esp-to-beam conversion",
+    "predicted": "esp-to-beam_conversion",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_019",
+    "notes": "esp_to_beam_candidate",
+    "lift": "ESP",
+    "archetype": "esp_to_beam_candidate",
+    "expected": "esp-to-beam conversion",
+    "predicted": "esp-to-beam_conversion",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_020",
+    "notes": "beam_pump_pumpoff",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_pumpoff",
+    "expected": "pump-off controller",
+    "predicted": "pump-off_controller",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_021",
+    "notes": "beam_pump_pumpoff",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_pumpoff",
+    "expected": "pump-off controller",
+    "predicted": "pump-off_controller",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_022",
+    "notes": "beam_pump_pumpoff",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_pumpoff",
+    "expected": "pump-off controller",
+    "predicted": "pump-off_controller",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_023",
+    "notes": "beam_pump_normal",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_024",
+    "notes": "beam_pump_normal",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_025",
+    "notes": "beam_pump_parted_rods",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_parted_rods",
+    "expected": "workover",
+    "predicted": "workover",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_026",
+    "notes": "beam_pump_parted_rods",
+    "lift": "Beam Pump",
+    "archetype": "beam_pump_parted_rods",
+    "expected": "workover",
+    "predicted": "workover",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_027",
+    "notes": "gas_lift_liquid_loading",
+    "lift": "Gas Lift",
+    "archetype": "gas_lift_liquid_loading",
+    "expected": "gas lift optimization",
+    "predicted": "gas_lift_optimization",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_028",
+    "notes": "gas_lift_liquid_loading",
+    "lift": "Gas Lift",
+    "archetype": "gas_lift_liquid_loading",
+    "expected": "gas lift optimization",
+    "predicted": "gas_lift_optimization",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_029",
+    "notes": "gas_lift_liquid_loading",
+    "lift": "Gas Lift",
+    "archetype": "gas_lift_liquid_loading",
+    "expected": "gas lift optimization",
+    "predicted": "gas_lift_optimization",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_030",
+    "notes": "gas_lift_normal",
+    "lift": "Gas Lift",
+    "archetype": "gas_lift_normal",
+    "expected": "monitor",
+    "predicted": "gas_lift_optimization",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_031",
+    "notes": "gas_lift_normal",
+    "lift": "Gas Lift",
+    "archetype": "gas_lift_normal",
+    "expected": "monitor",
+    "predicted": "monitor",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_032",
+    "notes": "plunger_lift_sticking",
+    "lift": "Plunger Lift",
+    "archetype": "plunger_lift_sticking",
+    "expected": "paraffin treatment",
+    "predicted": "paraffin_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_033",
+    "notes": "plunger_lift_sticking",
+    "lift": "Plunger Lift",
+    "archetype": "plunger_lift_sticking",
+    "expected": "paraffin treatment",
+    "predicted": "paraffin_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_034",
+    "notes": "low_recovery_p_and_a_candidate",
+    "lift": "Beam Pump",
+    "archetype": "low_recovery_p_and_a_candidate",
+    "expected": "p&a",
+    "predicted": "p&a",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_035",
+    "notes": "low_recovery_p_and_a_candidate",
+    "lift": "Beam Pump",
+    "archetype": "low_recovery_p_and_a_candidate",
+    "expected": "p&a",
+    "predicted": "p&a",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_036",
+    "notes": "esp_scale_with_gas_distractor",
+    "lift": "ESP",
+    "archetype": "esp_scale_with_gas_distractor",
+    "expected": "scale treatment",
+    "predicted": "acid_stimulation",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_037",
+    "notes": "esp_scale_with_gas_distractor",
+    "lift": "ESP",
+    "archetype": "esp_scale_with_gas_distractor",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_038",
+    "notes": "esp_acid_then_swap_sequenced",
+    "lift": "ESP",
+    "archetype": "esp_acid_then_swap_sequenced",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_039",
+    "notes": "esp_acid_then_swap_sequenced",
+    "lift": "ESP",
+    "archetype": "esp_acid_then_swap_sequenced",
+    "expected": "scale treatment",
+    "predicted": "scale_treatment",
+    "keyword_hit_rate": 1.0,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_040",
+    "notes": "insufficient_data_well",
+    "lift": "ESP",
+    "archetype": "insufficient_data_well",
+    "expected": "insufficient data",
+    "predicted": "monitor",
+    "keyword_hit_rate": 0.5,
+    "recommendation_match": true
+  },
+  {
+    "id": "case_041",
+    "notes": "insufficient_data_well",
+    "lift": "ESP",
+    "archetype": "insufficient_data_well",
+    "expected": "insufficient data",
+    "predicted": "insufficient_data",
+    "keyword_hit_rate": 0.0,
+    "recommendation_match": true,
+    "note_revision": "re-verified with hardened insufficient-data prompt (2026-06-03)"
+  }
+]

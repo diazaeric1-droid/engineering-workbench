@@ -1,0 +1,130 @@
+{
+  "well_id": "ED-015H",
+  "api_number": "42-109-10015",
+  "field": "Permian marginal (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2005-01-15",
+  "first_prod_date": "2005-04-01",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "Spraberry"
+  },
+  "artificial_lift": {
+    "type": "Beam Pump",
+    "installed_date": "2010-01-01",
+    "pump_spec": {
+      "model": "C-114D-143-64",
+      "stroke_in": 64,
+      "spm": 5,
+      "plunger_in": 1.5
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 3.7,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 60,
+      "oil_bopd": 3.8,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 90,
+      "oil_bopd": 4.6,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 120,
+      "oil_bopd": 3.9,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 180,
+      "oil_bopd": 4.2,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 4.1,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 300,
+      "oil_bopd": 4.5,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 365,
+      "oil_bopd": 4.1,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 450,
+      "oil_bopd": 3.9,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 540,
+      "oil_bopd": 4.1,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 630,
+      "oil_bopd": 4.7,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 720,
+      "oil_bopd": 4.9,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 810,
+      "oil_bopd": 4.6,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 900,
+      "oil_bopd": 4.5,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    },
+    {
+      "day": 990,
+      "oil_bopd": 4.1,
+      "water_bwpd": 90,
+      "gas_mcfd": 8
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [
+    {
+      "date": "2026-05-25",
+      "pattern": "Low fluid load.",
+      "fillage_pct": 74
+    }
+  ],
+  "notes": [
+    "~4 BOPD against ~90 BWPD for the last 6 months.",
+    "Lease operating cost sheet attached; last pulling job was a repair."
+  ]
+}

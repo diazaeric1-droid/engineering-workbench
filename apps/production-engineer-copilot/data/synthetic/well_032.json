@@ -1,0 +1,122 @@
+{
+  "well_id": "ED-032H",
+  "api_number": "42-109-10032",
+  "field": "Eagle Ford (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2017-11-01",
+  "first_prod_date": "2018-02-01",
+  "completion": {
+    "lateral_length_ft": 7500,
+    "stages": 30,
+    "proppant_lb_per_ft": 1800,
+    "fluid_bbl_per_ft": 40,
+    "formation": "Eagle Ford"
+  },
+  "artificial_lift": {
+    "type": "Plunger Lift",
+    "installed_date": "2020-06-01",
+    "pump_spec": {
+      "plunger_type": "Bypass",
+      "cycles_per_day_target": 24
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 307.8,
+      "water_bwpd": 160.1,
+      "gas_mcfd": 549.5
+    },
+    {
+      "day": 60,
+      "oil_bopd": 264.5,
+      "water_bwpd": 142.8,
+      "gas_mcfd": 468.1
+    },
+    {
+      "day": 90,
+      "oil_bopd": 250.9,
+      "water_bwpd": 140.5,
+      "gas_mcfd": 440.4
+    },
+    {
+      "day": 120,
+      "oil_bopd": 247.1,
+      "water_bwpd": 143.3,
+      "gas_mcfd": 430.0
+    },
+    {
+      "day": 180,
+      "oil_bopd": 217.6,
+      "water_bwpd": 134.9,
+      "gas_mcfd": 372.1
+    },
+    {
+      "day": 240,
+      "oil_bopd": 210.4,
+      "water_bwpd": 138.8,
+      "gas_mcfd": 353.4
+    },
+    {
+      "day": 300,
+      "oil_bopd": 163.3,
+      "water_bwpd": 114.3,
+      "gas_mcfd": 269.5
+    },
+    {
+      "day": 365,
+      "oil_bopd": 161.5,
+      "water_bwpd": 120.0,
+      "gas_mcfd": 261.2
+    },
+    {
+      "day": 450,
+      "oil_bopd": 145.2,
+      "water_bwpd": 116.2,
+      "gas_mcfd": 228.7
+    },
+    {
+      "day": 540,
+      "oil_bopd": 120.1,
+      "water_bwpd": 103.3,
+      "gas_mcfd": 183.8
+    },
+    {
+      "day": 630,
+      "oil_bopd": 117.1,
+      "water_bwpd": 107.8,
+      "gas_mcfd": 174.0
+    },
+    {
+      "day": 720,
+      "oil_bopd": 107.1,
+      "water_bwpd": 104.9,
+      "gas_mcfd": 154.2
+    },
+    {
+      "day": 810,
+      "oil_bopd": 57.1,
+      "water_bwpd": 105.9,
+      "gas_mcfd": 142.0
+    },
+    {
+      "day": 900,
+      "oil_bopd": 56.1,
+      "water_bwpd": 110.0,
+      "gas_mcfd": 135.0
+    },
+    {
+      "day": 990,
+      "oil_bopd": 48.6,
+      "water_bwpd": 100.5,
+      "gas_mcfd": 113.0
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Plunger arrival times erratic; cycle count down ~40% month over month.",
+    "Cooler weather onset; tubing temperature survey overdue."
+  ]
+}

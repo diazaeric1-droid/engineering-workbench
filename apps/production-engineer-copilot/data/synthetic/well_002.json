@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-002H",
+  "api_number": "42-109-10002",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2021-12-01",
+  "first_prod_date": "2022-03-15",
+  "completion": {
+    "lateral_length_ft": 10500,
+    "stages": 52,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Wolfcamp A"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2023-08-01",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 1121.1,
+      "water_bwpd": 583.0,
+      "gas_mcfd": 2001.3
+    },
+    {
+      "day": 60,
+      "oil_bopd": 1015.0,
+      "water_bwpd": 548.1,
+      "gas_mcfd": 1796.6
+    },
+    {
+      "day": 90,
+      "oil_bopd": 965.0,
+      "water_bwpd": 540.4,
+      "gas_mcfd": 1693.6
+    },
+    {
+      "day": 120,
+      "oil_bopd": 877.3,
+      "water_bwpd": 508.8,
+      "gas_mcfd": 1526.5
+    },
+    {
+      "day": 180,
+      "oil_bopd": 752.2,
+      "water_bwpd": 466.4,
+      "gas_mcfd": 1286.3
+    },
+    {
+      "day": 240,
+      "oil_bopd": 656.6,
+      "water_bwpd": 433.4,
+      "gas_mcfd": 1103.1
+    },
+    {
+      "day": 300,
+      "oil_bopd": 630.0,
+      "water_bwpd": 441.0,
+      "gas_mcfd": 1039.5
+    },
+    {
+      "day": 365,
+      "oil_bopd": 495.2,
+      "water_bwpd": 368.1,
+      "gas_mcfd": 801.0
+    },
+    {
+      "day": 450,
+      "oil_bopd": 429.0,
+      "water_bwpd": 343.2,
+      "gas_mcfd": 675.8
+    },
+    {
+      "day": 540,
+      "oil_bopd": 371.1,
+      "water_bwpd": 319.1,
+      "gas_mcfd": 567.8
+    },
+    {
+      "day": 630,
+      "oil_bopd": 355.1,
+      "water_bwpd": 326.7,
+      "gas_mcfd": 527.3
+    },
+    {
+      "day": 720,
+      "oil_bopd": 327.6,
+      "water_bwpd": 321.1,
+      "gas_mcfd": 471.8
+    },
+    {
+      "day": 810,
+      "oil_bopd": 205.5,
+      "water_bwpd": 291.3,
+      "gas_mcfd": 390.8
+    },
+    {
+      "day": 900,
+      "oil_bopd": 181.3,
+      "water_bwpd": 271.8,
+      "gas_mcfd": 333.6
+    },
+    {
+      "day": 990,
+      "oil_bopd": 167.2,
+      "water_bwpd": 264.3,
+      "gas_mcfd": 297.4
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 1694,
+      "intake_pressure_psi": 41,
+      "motor_temp_f": 304,
+      "motor_amps": 78,
+      "frequency_hz": 60
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 1631,
+      "intake_pressure_psi": 37,
+      "motor_temp_f": 306,
+      "motor_amps": 81,
+      "frequency_hz": 60
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Intake pressure stepping down while amps step up on the trend sheet.",
+    "Three months since the last chemical treatment on this well."
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-017H",
+  "api_number": "42-109-10017",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2021-12-01",
+  "first_prod_date": "2022-03-15",
+  "completion": {
+    "lateral_length_ft": 10500,
+    "stages": 52,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Wolfcamp A"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2023-08-01",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 1096.5,
+      "water_bwpd": 570.2,
+      "gas_mcfd": 1957.3
+    },
+    {
+      "day": 60,
+      "oil_bopd": 936.9,
+      "water_bwpd": 505.9,
+      "gas_mcfd": 1658.3
+    },
+    {
+      "day": 90,
+      "oil_bopd": 877.8,
+      "water_bwpd": 491.6,
+      "gas_mcfd": 1540.6
+    },
+    {
+      "day": 120,
+      "oil_bopd": 850.7,
+      "water_bwpd": 493.4,
+      "gas_mcfd": 1480.2
+    },
+    {
+      "day": 180,
+      "oil_bopd": 674.1,
+      "water_bwpd": 418.0,
+      "gas_mcfd": 1152.8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 590.3,
+      "water_bwpd": 389.6,
+      "gas_mcfd": 991.7
+    },
+    {
+      "day": 300,
+      "oil_bopd": 507.1,
+      "water_bwpd": 355.0,
+      "gas_mcfd": 836.7
+    },
+    {
+      "day": 365,
+      "oil_bopd": 461.7,
+      "water_bwpd": 343.2,
+      "gas_mcfd": 746.8
+    },
+    {
+      "day": 450,
+      "oil_bopd": 420.2,
+      "water_bwpd": 336.1,
+      "gas_mcfd": 661.7
+    },
+    {
+      "day": 540,
+      "oil_bopd": 369.5,
+      "water_bwpd": 317.8,
+      "gas_mcfd": 565.4
+    },
+    {
+      "day": 630,
+      "oil_bopd": 362.1,
+      "water_bwpd": 333.1,
+      "gas_mcfd": 537.7
+    },
+    {
+      "day": 720,
+      "oil_bopd": 319.6,
+      "water_bwpd": 313.3,
+      "gas_mcfd": 460.3
+    },
+    {
+      "day": 810,
+      "oil_bopd": 192.6,
+      "water_bwpd": 263.7,
+      "gas_mcfd": 353.7
+    },
+    {
+      "day": 900,
+      "oil_bopd": 202.4,
+      "water_bwpd": 293.0,
+      "gas_mcfd": 359.6
+    },
+    {
+      "day": 990,
+      "oil_bopd": 171.2,
+      "water_bwpd": 261.3,
+      "gas_mcfd": 294.0
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 1675,
+      "intake_pressure_psi": 39,
+      "motor_temp_f": 305,
+      "motor_amps": 78,
+      "frequency_hz": 60
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 1636,
+      "intake_pressure_psi": 32,
+      "motor_temp_f": 305,
+      "motor_amps": 81,
+      "frequency_hz": 60
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Below typical pump throughput with amps up and intake down.",
+    "Combined remedial + lift-sizing review requested."
+  ]
+}

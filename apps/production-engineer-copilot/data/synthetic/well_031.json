@@ -1,0 +1,121 @@
+{
+  "well_id": "ED-031H",
+  "api_number": "42-109-10031",
+  "field": "GoM Offshore (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2018-09-01",
+  "first_prod_date": "2019-02-15",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "Pliocene"
+  },
+  "artificial_lift": {
+    "type": "Gas Lift",
+    "installed_date": "2019-02-15",
+    "pump_spec": {
+      "injection_rate_mscfd_design": 1500,
+      "valve_count": 6
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 705.5,
+      "water_bwpd": 366.9,
+      "gas_mcfd": 1259.3
+    },
+    {
+      "day": 60,
+      "oil_bopd": 619.1,
+      "water_bwpd": 334.3,
+      "gas_mcfd": 1095.8
+    },
+    {
+      "day": 90,
+      "oil_bopd": 556.1,
+      "water_bwpd": 311.4,
+      "gas_mcfd": 975.9
+    },
+    {
+      "day": 120,
+      "oil_bopd": 577.6,
+      "water_bwpd": 335.0,
+      "gas_mcfd": 1005.1
+    },
+    {
+      "day": 180,
+      "oil_bopd": 495.2,
+      "water_bwpd": 307.0,
+      "gas_mcfd": 846.8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 484.4,
+      "water_bwpd": 319.7,
+      "gas_mcfd": 813.8
+    },
+    {
+      "day": 300,
+      "oil_bopd": 397.2,
+      "water_bwpd": 278.1,
+      "gas_mcfd": 655.4
+    },
+    {
+      "day": 365,
+      "oil_bopd": 356.8,
+      "water_bwpd": 265.3,
+      "gas_mcfd": 577.2
+    },
+    {
+      "day": 450,
+      "oil_bopd": 306.3,
+      "water_bwpd": 245.0,
+      "gas_mcfd": 482.4
+    },
+    {
+      "day": 540,
+      "oil_bopd": 285.3,
+      "water_bwpd": 245.3,
+      "gas_mcfd": 436.5
+    },
+    {
+      "day": 630,
+      "oil_bopd": 253.6,
+      "water_bwpd": 233.3,
+      "gas_mcfd": 376.6
+    },
+    {
+      "day": 720,
+      "oil_bopd": 236.6,
+      "water_bwpd": 231.9,
+      "gas_mcfd": 340.7
+    },
+    {
+      "day": 810,
+      "oil_bopd": 197.9,
+      "water_bwpd": 205.8,
+      "gas_mcfd": 276.1
+    },
+    {
+      "day": 900,
+      "oil_bopd": 182.6,
+      "water_bwpd": 200.9,
+      "gas_mcfd": 246.5
+    },
+    {
+      "day": 990,
+      "oil_bopd": 168.3,
+      "water_bwpd": 195.2,
+      "gas_mcfd": 219.6
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Stable THP, steady separator rate. Routine surveillance."
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-008H",
+  "api_number": "42-109-10008",
+  "field": "Midland Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2009-06-01",
+  "first_prod_date": "2009-09-01",
+  "completion": {
+    "lateral_length_ft": 7200,
+    "stages": 18,
+    "proppant_lb_per_ft": 1200,
+    "fluid_bbl_per_ft": 30,
+    "formation": "Spraberry"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2024-02-15",
+    "pump_spec": {
+      "model": "REDA 400-series",
+      "stages": 140,
+      "por_min_bfpd": 1500,
+      "por_max_bfpd": 3000,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 55
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 451.0,
+      "water_bwpd": 556.2,
+      "gas_mcfd": 312.3
+    },
+    {
+      "day": 60,
+      "oil_bopd": 445.0,
+      "water_bwpd": 563.7,
+      "gas_mcfd": 304.8
+    },
+    {
+      "day": 90,
+      "oil_bopd": 417.1,
+      "water_bwpd": 542.3,
+      "gas_mcfd": 282.6
+    },
+    {
+      "day": 120,
+      "oil_bopd": 417.3,
+      "water_bwpd": 556.4,
+      "gas_mcfd": 279.6
+    },
+    {
+      "day": 180,
+      "oil_bopd": 343.2,
+      "water_bwpd": 480.4,
+      "gas_mcfd": 224.8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 300.0,
+      "water_bwpd": 440.0,
+      "gas_mcfd": 192.0
+    },
+    {
+      "day": 300,
+      "oil_bopd": 276.5,
+      "water_bwpd": 423.9,
+      "gas_mcfd": 172.8
+    },
+    {
+      "day": 365,
+      "oil_bopd": 232.6,
+      "water_bwpd": 373.4,
+      "gas_mcfd": 141.6
+    },
+    {
+      "day": 450,
+      "oil_bopd": 205.6,
+      "water_bwpd": 349.6,
+      "gas_mcfd": 120.8
+    },
+    {
+      "day": 540,
+      "oil_bopd": 117.5,
+      "water_bwpd": 387.2,
+      "gas_mcfd": 121.6
+    },
+    {
+      "day": 630,
+      "oil_bopd": 110.7,
+      "water_bwpd": 385.0,
+      "gas_mcfd": 109.9
+    },
+    {
+      "day": 720,
+      "oil_bopd": 88.4,
+      "water_bwpd": 323.6,
+      "gas_mcfd": 84.1
+    },
+    {
+      "day": 810,
+      "oil_bopd": 82.0,
+      "water_bwpd": 315.3,
+      "gas_mcfd": 74.7
+    },
+    {
+      "day": 900,
+      "oil_bopd": 72.7,
+      "water_bwpd": 292.9,
+      "gas_mcfd": 63.2
+    },
+    {
+      "day": 990,
+      "oil_bopd": 71.3,
+      "water_bwpd": 300.5,
+      "gas_mcfd": 59.1
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 901,
+      "intake_pressure_psi": 79,
+      "motor_temp_f": 300,
+      "motor_amps": 43,
+      "frequency_hz": 41
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 871,
+      "intake_pressure_psi": 71,
+      "motor_temp_f": 309,
+      "motor_amps": 47,
+      "frequency_hz": 41
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Rate ~871 BFPD; VSD already near minimum frequency.",
+    "Several offset wells in this section run rod lift."
+  ]
+}

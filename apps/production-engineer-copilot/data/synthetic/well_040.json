@@ -1,0 +1,60 @@
+{
+  "well_id": "ED-040H",
+  "api_number": "42-109-10040",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2025-11-01",
+  "first_prod_date": "2026-01-15",
+  "completion": {
+    "lateral_length_ft": 10000,
+    "stages": 50,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Wolfcamp A"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2026-01-15",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 932.3,
+      "water_bwpd": 475.4,
+      "gas_mcfd": 1657.6
+    },
+    {
+      "day": 60,
+      "oil_bopd": 912.3,
+      "water_bwpd": 432.6,
+      "gas_mcfd": 1773.8
+    },
+    {
+      "day": 90,
+      "oil_bopd": 946.1,
+      "water_bwpd": 591.0,
+      "gas_mcfd": 1597.4
+    },
+    {
+      "day": 120,
+      "oil_bopd": 892.2,
+      "water_bwpd": 550.7,
+      "gas_mcfd": 1852.4
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "New well; only four monthly tests available so far.",
+    "Downhole gauge install pending; no ESP card yet."
+  ]
+}

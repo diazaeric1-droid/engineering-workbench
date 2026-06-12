@@ -1,0 +1,20 @@
+[
+  {
+    "model": "claude-haiku-4-5-20251001",
+    "agreement": 1.0,
+    "hits": 12,
+    "n": 12,
+    "mean_tokens": 21354,
+    "mean_latency_s": 22.5,
+    "cost_per_review_usd": 0.0285
+  },
+  {
+    "model": "claude-sonnet-4-6",
+    "agreement": 1.0,
+    "hits": 12,
+    "n": 12,
+    "mean_tokens": 29519,
+    "mean_latency_s": 54.7,
+    "cost_per_review_usd": 0.1173
+  }
+]

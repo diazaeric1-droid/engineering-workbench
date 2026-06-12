@@ -1,0 +1,23 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.streamlit/secrets.toml
+evals/results/
+# ...but DO track the scored summaries — the CI regression gate (check_gate.py) reads
+# summary.json, so it must be committed or CI fails on a fresh checkout.
+!evals/results/summary.json
+!evals/results/holdout/
+!evals/results/holdout/summary_holdout.json
+!evals/results/model_frontier.json
+!evals/results/adversarial.txt
+.DS_Store
+
+# user-supplied real NDIC extract (not committed; template + README are)
+data/real/ndic/production.csv

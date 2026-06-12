@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-036H",
+  "api_number": "42-109-10036",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2021-05-01",
+  "first_prod_date": "2021-08-01",
+  "completion": {
+    "lateral_length_ft": 10800,
+    "stages": 54,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Bone Spring 3rd"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2023-09-15",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 1189.8,
+      "water_bwpd": 618.7,
+      "gas_mcfd": 2123.8
+    },
+    {
+      "day": 60,
+      "oil_bopd": 1066.4,
+      "water_bwpd": 575.8,
+      "gas_mcfd": 1887.5
+    },
+    {
+      "day": 90,
+      "oil_bopd": 964.1,
+      "water_bwpd": 539.9,
+      "gas_mcfd": 1692.1
+    },
+    {
+      "day": 120,
+      "oil_bopd": 921.1,
+      "water_bwpd": 534.2,
+      "gas_mcfd": 1602.7
+    },
+    {
+      "day": 180,
+      "oil_bopd": 768.3,
+      "water_bwpd": 476.3,
+      "gas_mcfd": 1313.7
+    },
+    {
+      "day": 240,
+      "oil_bopd": 675.3,
+      "water_bwpd": 445.7,
+      "gas_mcfd": 1134.4
+    },
+    {
+      "day": 300,
+      "oil_bopd": 596.0,
+      "water_bwpd": 417.2,
+      "gas_mcfd": 983.4
+    },
+    {
+      "day": 365,
+      "oil_bopd": 522.5,
+      "water_bwpd": 388.4,
+      "gas_mcfd": 845.2
+    },
+    {
+      "day": 450,
+      "oil_bopd": 408.1,
+      "water_bwpd": 326.5,
+      "gas_mcfd": 642.7
+    },
+    {
+      "day": 540,
+      "oil_bopd": 395.5,
+      "water_bwpd": 340.1,
+      "gas_mcfd": 605.1
+    },
+    {
+      "day": 630,
+      "oil_bopd": 341.0,
+      "water_bwpd": 313.7,
+      "gas_mcfd": 506.4
+    },
+    {
+      "day": 720,
+      "oil_bopd": 295.6,
+      "water_bwpd": 289.7,
+      "gas_mcfd": 425.7
+    },
+    {
+      "day": 810,
+      "oil_bopd": 239.2,
+      "water_bwpd": 323.4,
+      "gas_mcfd": 433.8
+    },
+    {
+      "day": 900,
+      "oil_bopd": 219.3,
+      "water_bwpd": 313.7,
+      "gas_mcfd": 385.0
+    },
+    {
+      "day": 990,
+      "oil_bopd": 198.6,
+      "water_bwpd": 299.5,
+      "gas_mcfd": 337.0
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 2219,
+      "intake_pressure_psi": 48,
+      "motor_temp_f": 329,
+      "motor_amps": 85,
+      "frequency_hz": 60
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 2079,
+      "intake_pressure_psi": 52,
+      "motor_temp_f": 339,
+      "motor_amps": 88,
+      "frequency_hz": 60
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Amps elevated and stepping up; intake pressure somewhat low.",
+    "Some gas breakout noted on a recent fluid shot."
+  ]
+}

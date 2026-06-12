@@ -1,0 +1,129 @@
+{
+  "well_id": "ED-024H",
+  "api_number": "42-109-10024",
+  "field": "Permian conventional (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2015-03-01",
+  "first_prod_date": "2015-06-01",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "San Andres"
+  },
+  "artificial_lift": {
+    "type": "Beam Pump",
+    "installed_date": "2019-04-10",
+    "pump_spec": {
+      "model": "C-228D-200-74",
+      "stroke_in": 74,
+      "spm": 6.5,
+      "plunger_in": 1.75
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 123.2,
+      "water_bwpd": 64.1,
+      "gas_mcfd": 219.9
+    },
+    {
+      "day": 60,
+      "oil_bopd": 107.3,
+      "water_bwpd": 58.0,
+      "gas_mcfd": 190.0
+    },
+    {
+      "day": 90,
+      "oil_bopd": 118.3,
+      "water_bwpd": 66.2,
+      "gas_mcfd": 207.6
+    },
+    {
+      "day": 120,
+      "oil_bopd": 121.2,
+      "water_bwpd": 70.3,
+      "gas_mcfd": 210.9
+    },
+    {
+      "day": 180,
+      "oil_bopd": 93.6,
+      "water_bwpd": 58.0,
+      "gas_mcfd": 160.0
+    },
+    {
+      "day": 240,
+      "oil_bopd": 89.2,
+      "water_bwpd": 58.9,
+      "gas_mcfd": 149.9
+    },
+    {
+      "day": 300,
+      "oil_bopd": 100.9,
+      "water_bwpd": 70.6,
+      "gas_mcfd": 166.4
+    },
+    {
+      "day": 365,
+      "oil_bopd": 84.9,
+      "water_bwpd": 63.1,
+      "gas_mcfd": 137.3
+    },
+    {
+      "day": 450,
+      "oil_bopd": 89.3,
+      "water_bwpd": 71.5,
+      "gas_mcfd": 140.7
+    },
+    {
+      "day": 540,
+      "oil_bopd": 72.1,
+      "water_bwpd": 62.0,
+      "gas_mcfd": 110.3
+    },
+    {
+      "day": 630,
+      "oil_bopd": 77.8,
+      "water_bwpd": 71.6,
+      "gas_mcfd": 115.5
+    },
+    {
+      "day": 720,
+      "oil_bopd": 65.8,
+      "water_bwpd": 64.5,
+      "gas_mcfd": 94.8
+    },
+    {
+      "day": 810,
+      "oil_bopd": 62.3,
+      "water_bwpd": 64.8,
+      "gas_mcfd": 86.9
+    },
+    {
+      "day": 900,
+      "oil_bopd": 64.5,
+      "water_bwpd": 70.9,
+      "gas_mcfd": 87.1
+    },
+    {
+      "day": 990,
+      "oil_bopd": 52.4,
+      "water_bwpd": 60.7,
+      "gas_mcfd": 68.3
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [
+    {
+      "date": "2026-05-25",
+      "pattern": "Full, well-shaped card.",
+      "fillage_pct": 97
+    }
+  ],
+  "notes": [
+    "Annual integrity check due. No production complaints."
+  ]
+}

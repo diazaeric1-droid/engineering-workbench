@@ -1,0 +1,130 @@
+{
+  "well_id": "ED-026H",
+  "api_number": "42-109-10026",
+  "field": "Permian conventional (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2015-03-01",
+  "first_prod_date": "2015-06-01",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "San Andres"
+  },
+  "artificial_lift": {
+    "type": "Beam Pump",
+    "installed_date": "2019-04-10",
+    "pump_spec": {
+      "model": "C-228D-200-74",
+      "stroke_in": 74,
+      "spm": 6.5,
+      "plunger_in": 1.75
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 118.9,
+      "water_bwpd": 61.8,
+      "gas_mcfd": 212.2
+    },
+    {
+      "day": 60,
+      "oil_bopd": 131.1,
+      "water_bwpd": 70.8,
+      "gas_mcfd": 232.1
+    },
+    {
+      "day": 90,
+      "oil_bopd": 108.8,
+      "water_bwpd": 60.9,
+      "gas_mcfd": 191.0
+    },
+    {
+      "day": 120,
+      "oil_bopd": 103.9,
+      "water_bwpd": 60.2,
+      "gas_mcfd": 180.7
+    },
+    {
+      "day": 180,
+      "oil_bopd": 94.6,
+      "water_bwpd": 58.7,
+      "gas_mcfd": 161.8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 87.5,
+      "water_bwpd": 57.8,
+      "gas_mcfd": 147.0
+    },
+    {
+      "day": 300,
+      "oil_bopd": 81.5,
+      "water_bwpd": 57.0,
+      "gas_mcfd": 134.4
+    },
+    {
+      "day": 365,
+      "oil_bopd": 79.5,
+      "water_bwpd": 59.1,
+      "gas_mcfd": 128.6
+    },
+    {
+      "day": 450,
+      "oil_bopd": 79.3,
+      "water_bwpd": 63.4,
+      "gas_mcfd": 124.9
+    },
+    {
+      "day": 540,
+      "oil_bopd": 76.2,
+      "water_bwpd": 65.5,
+      "gas_mcfd": 116.5
+    },
+    {
+      "day": 630,
+      "oil_bopd": 69.5,
+      "water_bwpd": 63.9,
+      "gas_mcfd": 103.2
+    },
+    {
+      "day": 720,
+      "oil_bopd": 60.7,
+      "water_bwpd": 59.5,
+      "gas_mcfd": 87.4
+    },
+    {
+      "day": 810,
+      "oil_bopd": 65.0,
+      "water_bwpd": 67.6,
+      "gas_mcfd": 90.6
+    },
+    {
+      "day": 900,
+      "oil_bopd": 3.0,
+      "water_bwpd": 66.3,
+      "gas_mcfd": 81.4
+    },
+    {
+      "day": 990,
+      "oil_bopd": 2.6,
+      "water_bwpd": 61.3,
+      "gas_mcfd": 69.0
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [
+    {
+      "date": "2026-05-25",
+      "pattern": "Flat card, no fluid load.",
+      "fillage_pct": 6
+    }
+  ],
+  "notes": [
+    "Production dropped to near zero over a single day.",
+    "Surface unit still stroking."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "well_id": "15/9-F-12 H",
+  "api_number": "NO-15/9-F-12",
+  "field": "Volve (Equinor open data, North Sea)",
+  "operator": "Equinor (former Statoil)",
+  "spud_date": "2007-08-01",
+  "first_prod_date": "2008-02-12",
+  "well_bore_code": "15/9-F-12",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "Hugin (Middle Jurassic sandstone)"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2008-02-12",
+    "pump_spec": {
+      "model": "Volve subsea ESP",
+      "stages": 0,
+      "por_min_bfpd": 8000,
+      "por_max_bfpd": 30000,
+      "motor_temp_max_f": 450,
+      "motor_amps_nameplate": 0
+    }
+  },
+  "notes": [
+    "Imported from Volve public production CSV (Equinor open dataset, CC BY-NC-SA 4.0).",
+    "North Sea subsea ESP producer; downhole pressure/temperature gauges present."
+  ]
+}

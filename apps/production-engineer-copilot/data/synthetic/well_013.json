@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-013H",
+  "api_number": "42-109-10013",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2021-05-01",
+  "first_prod_date": "2021-08-01",
+  "completion": {
+    "lateral_length_ft": 10800,
+    "stages": 54,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Bone Spring 3rd"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2023-09-15",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 1093.4,
+      "water_bwpd": 568.6,
+      "gas_mcfd": 1951.7
+    },
+    {
+      "day": 60,
+      "oil_bopd": 967.8,
+      "water_bwpd": 522.6,
+      "gas_mcfd": 1713.0
+    },
+    {
+      "day": 90,
+      "oil_bopd": 815.9,
+      "water_bwpd": 456.9,
+      "gas_mcfd": 1431.9
+    },
+    {
+      "day": 120,
+      "oil_bopd": 775.2,
+      "water_bwpd": 449.6,
+      "gas_mcfd": 1348.8
+    },
+    {
+      "day": 180,
+      "oil_bopd": 690.9,
+      "water_bwpd": 428.4,
+      "gas_mcfd": 1181.4
+    },
+    {
+      "day": 240,
+      "oil_bopd": 597.9,
+      "water_bwpd": 394.6,
+      "gas_mcfd": 1004.5
+    },
+    {
+      "day": 300,
+      "oil_bopd": 521.2,
+      "water_bwpd": 364.9,
+      "gas_mcfd": 860.0
+    },
+    {
+      "day": 365,
+      "oil_bopd": 468.1,
+      "water_bwpd": 347.9,
+      "gas_mcfd": 757.1
+    },
+    {
+      "day": 450,
+      "oil_bopd": 405.2,
+      "water_bwpd": 324.1,
+      "gas_mcfd": 638.1
+    },
+    {
+      "day": 540,
+      "oil_bopd": 363.4,
+      "water_bwpd": 312.6,
+      "gas_mcfd": 556.1
+    },
+    {
+      "day": 630,
+      "oil_bopd": 344.9,
+      "water_bwpd": 317.3,
+      "gas_mcfd": 512.2
+    },
+    {
+      "day": 720,
+      "oil_bopd": 252.1,
+      "water_bwpd": 247.1,
+      "gas_mcfd": 363.0
+    },
+    {
+      "day": 810,
+      "oil_bopd": 180.2,
+      "water_bwpd": 270.0,
+      "gas_mcfd": 362.1
+    },
+    {
+      "day": 900,
+      "oil_bopd": 168.3,
+      "water_bwpd": 266.8,
+      "gas_mcfd": 327.4
+    },
+    {
+      "day": 990,
+      "oil_bopd": 155.9,
+      "water_bwpd": 260.6,
+      "gas_mcfd": 293.2
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 2196,
+      "intake_pressure_psi": 103,
+      "motor_temp_f": 332,
+      "motor_amps": 76,
+      "frequency_hz": 60
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 2097,
+      "intake_pressure_psi": 99,
+      "motor_temp_f": 336,
+      "motor_amps": 79,
+      "frequency_hz": 60
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "High-calcium-carbonate area. Last inhibitor batch logged ~4 months ago.",
+    "Motor amps stepping up week over week on the trend sheet."
+  ]
+}

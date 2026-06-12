@@ -1,0 +1,142 @@
+{
+  "well_id": "ED-015H",
+  "api_number": "42-109-10015",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2023-02-10",
+  "first_prod_date": "2023-05-01",
+  "completion": {
+    "lateral_length_ft": 10500,
+    "stages": 52,
+    "proppant_lb_per_ft": 2400,
+    "fluid_bbl_per_ft": 55,
+    "formation": "Wolfcamp A"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2024-08-01",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 931.6,
+      "water_bwpd": 484.4,
+      "gas_mcfd": 1662.8
+    },
+    {
+      "day": 60,
+      "oil_bopd": 925.7,
+      "water_bwpd": 499.9,
+      "gas_mcfd": 1638.5
+    },
+    {
+      "day": 90,
+      "oil_bopd": 808.2,
+      "water_bwpd": 452.6,
+      "gas_mcfd": 1418.4
+    },
+    {
+      "day": 120,
+      "oil_bopd": 777.1,
+      "water_bwpd": 450.7,
+      "gas_mcfd": 1352.2
+    },
+    {
+      "day": 180,
+      "oil_bopd": 751.0,
+      "water_bwpd": 465.6,
+      "gas_mcfd": 1284.2
+    },
+    {
+      "day": 240,
+      "oil_bopd": 639.8,
+      "water_bwpd": 422.3,
+      "gas_mcfd": 1074.8
+    },
+    {
+      "day": 300,
+      "oil_bopd": 537.6,
+      "water_bwpd": 376.3,
+      "gas_mcfd": 887.1
+    },
+    {
+      "day": 365,
+      "oil_bopd": 476.0,
+      "water_bwpd": 353.9,
+      "gas_mcfd": 770.0
+    },
+    {
+      "day": 450,
+      "oil_bopd": 443.8,
+      "water_bwpd": 355.0,
+      "gas_mcfd": 699.0
+    },
+    {
+      "day": 540,
+      "oil_bopd": 370.1,
+      "water_bwpd": 318.2,
+      "gas_mcfd": 566.2
+    },
+    {
+      "day": 630,
+      "oil_bopd": 342.5,
+      "water_bwpd": 315.1,
+      "gas_mcfd": 508.7
+    },
+    {
+      "day": 720,
+      "oil_bopd": 326.9,
+      "water_bwpd": 320.3,
+      "gas_mcfd": 470.7
+    },
+    {
+      "day": 810,
+      "oil_bopd": 311.6,
+      "water_bwpd": 324.0,
+      "gas_mcfd": 434.6
+    },
+    {
+      "day": 900,
+      "oil_bopd": 279.6,
+      "water_bwpd": 307.6,
+      "gas_mcfd": 377.5
+    },
+    {
+      "day": 990,
+      "oil_bopd": 222.7,
+      "water_bwpd": 258.3,
+      "gas_mcfd": 290.6
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 2402,
+      "intake_pressure_psi": 135,
+      "motor_temp_f": 289,
+      "motor_amps": 62,
+      "frequency_hz": 58
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 2390,
+      "intake_pressure_psi": 137,
+      "motor_temp_f": 285,
+      "motor_amps": 60,
+      "frequency_hz": 58
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Routine quarterly surveillance pull. No operator complaints logged."
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "well_id": "ED-028H",
+  "api_number": "42-109-10028",
+  "field": "GoM Offshore (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2018-09-01",
+  "first_prod_date": "2019-02-15",
+  "completion": {
+    "lateral_length_ft": 0,
+    "stages": 0,
+    "proppant_lb_per_ft": 0,
+    "fluid_bbl_per_ft": 0,
+    "formation": "Pliocene"
+  },
+  "artificial_lift": {
+    "type": "Gas Lift",
+    "installed_date": "2019-02-15",
+    "pump_spec": {
+      "injection_rate_mscfd_design": 1500,
+      "valve_count": 6
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 698.2,
+      "water_bwpd": 363.1,
+      "gas_mcfd": 1068.2
+    },
+    {
+      "day": 60,
+      "oil_bopd": 683.1,
+      "water_bwpd": 368.9,
+      "gas_mcfd": 1065.6
+    },
+    {
+      "day": 90,
+      "oil_bopd": 678.9,
+      "water_bwpd": 380.2,
+      "gas_mcfd": 1079.4
+    },
+    {
+      "day": 120,
+      "oil_bopd": 551.1,
+      "water_bwpd": 319.6,
+      "gas_mcfd": 892.8
+    },
+    {
+      "day": 180,
+      "oil_bopd": 524.0,
+      "water_bwpd": 324.9,
+      "gas_mcfd": 880.3
+    },
+    {
+      "day": 240,
+      "oil_bopd": 503.7,
+      "water_bwpd": 332.4,
+      "gas_mcfd": 876.4
+    },
+    {
+      "day": 300,
+      "oil_bopd": 381.4,
+      "water_bwpd": 267.0,
+      "gas_mcfd": 686.5
+    },
+    {
+      "day": 365,
+      "oil_bopd": 350.5,
+      "water_bwpd": 260.6,
+      "gas_mcfd": 653.8
+    },
+    {
+      "day": 450,
+      "oil_bopd": 323.7,
+      "water_bwpd": 258.9,
+      "gas_mcfd": 631.2
+    },
+    {
+      "day": 540,
+      "oil_bopd": 285.8,
+      "water_bwpd": 245.8,
+      "gas_mcfd": 583.0
+    },
+    {
+      "day": 630,
+      "oil_bopd": 273.8,
+      "water_bwpd": 251.9,
+      "gas_mcfd": 583.1
+    },
+    {
+      "day": 720,
+      "oil_bopd": 122.9,
+      "water_bwpd": 236.0,
+      "gas_mcfd": 534.6
+    },
+    {
+      "day": 810,
+      "oil_bopd": 100.8,
+      "water_bwpd": 205.5,
+      "gas_mcfd": 456.4
+    },
+    {
+      "day": 900,
+      "oil_bopd": 104.1,
+      "water_bwpd": 224.4,
+      "gas_mcfd": 489.6
+    },
+    {
+      "day": 990,
+      "oil_bopd": 90.9,
+      "water_bwpd": 206.6,
+      "gas_mcfd": 443.5
+    }
+  ],
+  "esp_readings": [],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Tubing-head pressure cycling at surface; intermittent liquid slugs to the separator.",
+    "Lift-gas metering station flagged possible under-injection."
+  ]
+}

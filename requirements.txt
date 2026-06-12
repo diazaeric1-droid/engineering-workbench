@@ -1,0 +1,15 @@
+# Engineering Workbench — union of the four vendored components' runtime deps,
+# resolved on Python 3.11 (pinned via runtime.txt; bluebonnet supports <=3.11).
+streamlit>=1.50
+plotly>=5.18.0
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.12.0
+scikit-learn>=1.4.0          # esp: classifier calibration + survival hazard model
+xgboost>=2.0.0               # esp: gradient-boosted risk model (Tree SHAP via pred_contribs)
+joblib>=1.3.0                # esp: model artifact persistence
+prodpy                       # pec: Monte-Carlo Arps bands (only prodpy.decline, lazy-loaded)
+bluebonnet                   # wps: PVT / physics curves / RTA (unpinned, per WPS)
+anthropic>=0.40.0            # BYOK AI Well Review (deterministic paths need no key)
+python-dotenv>=1.0.0         # pec.agent env handling
+rich>=13.7.0                 # pec.agent / esp.train console output

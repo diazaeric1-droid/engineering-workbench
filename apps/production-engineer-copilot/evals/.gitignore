@@ -1,0 +1,16 @@
+# Engineering Workbench product-glue (NOT a component file — see VENDORING.md).
+#
+# The component's own .gitignore says `evals/results/`, relying on the four
+# scored summaries being ALREADY TRACKED in its home repo (gitignore never
+# applies to tracked files). In this fresh product repo nothing is pre-tracked,
+# so that directory rule would silently drop the committed eval artifacts the
+# honest-eval chip reads. This deeper file takes precedence for this subtree
+# and re-selects exactly the four files upstream tracks.
+!results
+results/*
+!results/summary.json
+!results/model_frontier.json
+!results/adversarial.txt
+!results/holdout
+results/holdout/*
+!results/holdout/summary_holdout.json

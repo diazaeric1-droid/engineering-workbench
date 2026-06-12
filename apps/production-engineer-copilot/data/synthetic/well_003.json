@@ -1,0 +1,143 @@
+{
+  "well_id": "ED-003H",
+  "api_number": "42-109-10003",
+  "field": "Delaware Basin (synthetic)",
+  "operator": "Synthetic Operator LLC",
+  "spud_date": "2022-04-10",
+  "first_prod_date": "2022-07-01",
+  "completion": {
+    "lateral_length_ft": 9800,
+    "stages": 48,
+    "proppant_lb_per_ft": 2300,
+    "fluid_bbl_per_ft": 52,
+    "formation": "Wolfcamp B"
+  },
+  "artificial_lift": {
+    "type": "ESP",
+    "installed_date": "2024-01-15",
+    "pump_spec": {
+      "model": "REDA 538-D2700N",
+      "stages": 180,
+      "por_min_bfpd": 1800,
+      "por_max_bfpd": 3400,
+      "motor_temp_max_f": 350,
+      "motor_amps_nameplate": 65
+    }
+  },
+  "production_history": [
+    {
+      "day": 30,
+      "oil_bopd": 1028.9,
+      "water_bwpd": 535.0,
+      "gas_mcfd": 1836.6
+    },
+    {
+      "day": 60,
+      "oil_bopd": 957.2,
+      "water_bwpd": 516.9,
+      "gas_mcfd": 1694.2
+    },
+    {
+      "day": 90,
+      "oil_bopd": 791.7,
+      "water_bwpd": 443.4,
+      "gas_mcfd": 1389.5
+    },
+    {
+      "day": 120,
+      "oil_bopd": 777.3,
+      "water_bwpd": 450.8,
+      "gas_mcfd": 1352.5
+    },
+    {
+      "day": 180,
+      "oil_bopd": 668.9,
+      "water_bwpd": 414.7,
+      "gas_mcfd": 1143.8
+    },
+    {
+      "day": 240,
+      "oil_bopd": 583.5,
+      "water_bwpd": 385.1,
+      "gas_mcfd": 980.3
+    },
+    {
+      "day": 300,
+      "oil_bopd": 529.3,
+      "water_bwpd": 370.5,
+      "gas_mcfd": 873.4
+    },
+    {
+      "day": 365,
+      "oil_bopd": 514.4,
+      "water_bwpd": 382.4,
+      "gas_mcfd": 832.0
+    },
+    {
+      "day": 450,
+      "oil_bopd": 399.8,
+      "water_bwpd": 319.9,
+      "gas_mcfd": 629.7
+    },
+    {
+      "day": 540,
+      "oil_bopd": 385.1,
+      "water_bwpd": 331.2,
+      "gas_mcfd": 589.2
+    },
+    {
+      "day": 630,
+      "oil_bopd": 299.3,
+      "water_bwpd": 275.3,
+      "gas_mcfd": 444.4
+    },
+    {
+      "day": 720,
+      "oil_bopd": 212.6,
+      "water_bwpd": 282.9,
+      "gas_mcfd": 415.7
+    },
+    {
+      "day": 810,
+      "oil_bopd": 197.5,
+      "water_bwpd": 279.0,
+      "gas_mcfd": 374.2
+    },
+    {
+      "day": 900,
+      "oil_bopd": 184.1,
+      "water_bwpd": 275.0,
+      "gas_mcfd": 337.5
+    },
+    {
+      "day": 990,
+      "oil_bopd": 170.1,
+      "water_bwpd": 267.9,
+      "gas_mcfd": 301.4
+    }
+  ],
+  "esp_readings": [
+    {
+      "date": "2026-05-21",
+      "bfpd": 1604,
+      "intake_pressure_psi": 85,
+      "motor_temp_f": 285,
+      "motor_amps": 56,
+      "frequency_hz": 55
+    },
+    {
+      "date": "2026-05-25",
+      "bfpd": 1534,
+      "intake_pressure_psi": 79,
+      "motor_temp_f": 291,
+      "motor_amps": 58,
+      "frequency_hz": 54
+    }
+  ],
+  "scada_recent": [],
+  "dyno_cards": [],
+  "notes": [
+    "Pump rate ~1534 BFPD on last test; intake ~79 psi.",
+    "Annual subsurface review pulled this well for inspection."
+  ]
+}

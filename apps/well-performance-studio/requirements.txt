@@ -1,0 +1,8 @@
+streamlit>=1.50
+plotly>=5.18.0
+pandas
+numpy
+scipy
+bluebonnet
+anthropic>=0.40.0
+python-dotenv
