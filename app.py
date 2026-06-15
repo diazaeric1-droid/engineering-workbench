@@ -22,11 +22,15 @@ if str(HERE) not in sys.path:
 # Streamlit Cloud reuses the container across redeploys; a cached OLD `theme` /
 # `fleet_registry` in sys.modules (or a stale .pyc) can lack symbols added in a
 # newer commit. Drop bytecode + evict the cached modules so the imports below
-# reload from the CURRENT commit's source.
-import shutil as _sh_heal
-_sh_heal.rmtree(HERE / "__pycache__", ignore_errors=True)
-for _stale in ("theme", "fleet_registry", "product_theme"):
-    sys.modules.pop(_stale, None)
+# reload from the CURRENT commit's source. Streamlit re-runs this whole script on
+# EVERY interaction, so gate the heal to ONCE per session — re-running rmtree on
+# every rerun just defeats bytecode caching for no benefit (audit: infra perf).
+if not st.session_state.get("_workbench_healed"):
+    import shutil as _sh_heal
+    _sh_heal.rmtree(HERE / "__pycache__", ignore_errors=True)
+    for _stale in ("theme", "fleet_registry", "product_theme"):
+        sys.modules.pop(_stale, None)
+    st.session_state["_workbench_healed"] = True
 
 import product_theme as pt  # noqa: E402
 
@@ -34,20 +38,34 @@ pt.setup_product("workbench")
 
 import core  # noqa: E402  (loads the four component aliases)
 from views import PAGES  # noqa: E402
+from views import _common as vc  # noqa: E402  (cached well-id lists, shared plumbing)
 
 
-# ---- first-run bootstrap (gitignored synthetic data + the ESP model) ----------
+# ---- workspace readiness (silent on a warm / committed checkout) ---------------
+# The synthetic SCADA + injection fleets and the trained ESP model are COMMITTED to
+# the repo (see .gitignore), so on a normal checkout they already exist and this is
+# a no-op — no banner, no ~30 s training on load. Only a cold environment that is
+# genuinely missing the artifacts (or a model that fails to load under a different
+# sklearn/xgboost) regenerates them, once, behind a quiet spinner.
 @st.cache_resource(show_spinner=False)
-def _bootstrap_once() -> bool:
-    msgs: list[str] = []
-    with st.status("First-time setup: regenerating synthetic data + training the "
-                   "ESP model (~30 s, one time)…", expanded=False) as status:
-        core.bootstrap(log=lambda m: (msgs.append(str(m)), status.write(str(m))))
-        status.update(label="Workspace ready.", state="complete")
+def _ensure_workspace() -> bool:
+    ready = (core.ESP_MODEL.exists() and core.ESP_TRAINING_REPORT.exists()
+             and any(core.ESP_DATA.glob("well_*.csv"))
+             and core.GLA_FLEET_DIR.exists()
+             and any(core.GLA_FLEET_DIR.glob("well_*.csv")))
+    if ready:
+        try:  # the committed artifact must actually load on this runtime
+            core.esp_model.ESPRiskModel.load(core.ESP_MODEL)
+        except Exception:  # noqa: BLE001 — stale/incompatible artifact: self-heal below
+            ready = False
+    if not ready:
+        with st.spinner("Preparing the workbench (first run on this environment, "
+                        "~30 s, one time)…"):
+            core.bootstrap(log=lambda *_a, **_k: None)
     return True
 
 
-_bootstrap_once()
+_ensure_workspace()
 
 
 # ---- session-state contract -----------------------------------------------------
@@ -55,23 +73,28 @@ ss = st.session_state
 ss.setdefault("oil_price", 70.0)
 ss.setdefault("nri", 0.80)
 ss.setdefault("discount", 0.10)
-ss.setdefault("data_source", "real")
+ss.setdefault("gas_cost", 1.50)            # shared so Gas-Lift + Case File agree
+ss.setdefault("data_source", "synthetic")  # synthetic demo fleet is the default universe
 ss.setdefault("anthropic_key", "")
-_choices = core.well_choices()
-if not ss.get("well_id") or ss["well_id"] not in _choices:
-    # Default to the first REAL Colorado well so the diagnose pages open on real
-    # data (green badge); synthetic well_0NN wells are one pick away.
-    ss["well_id"] = _choices[0] if _choices else ""
+# Open on the flagship synthetic well (production + SCADA + injection) so every page
+# has data on first load; real Colorado is one toggle away.
+ss.setdefault("well_id", "well_013")
+
+# The data source SCOPES the well list (synthetic well_0NN vs real Colorado ids).
+_choices = vc.well_choices_for(ss["data_source"])
+if ss["well_id"] not in _choices:
+    ss["well_id"] = _choices[0] if _choices else ss["well_id"]
 
 
 def _snap_well_to_source() -> None:
-    """When the data-source toggle flips, snap the selection to that source's
-    first well (real CO API id, or the synthetic case-file hero well_013)."""
+    """When the data-source toggle flips, snap the selection to that source's lead
+    well so the (now scoped) Well selectbox always has a valid value: the synthetic
+    case-file hero well_013, or the first real Colorado API id."""
     if st.session_state["data_source"] == "real":
-        co = sorted(core.colorado_wells())
+        co = vc.colorado_well_ids()
         st.session_state["well_id"] = co[0] if co else st.session_state["well_id"]
     else:
-        synth = [w for w in core.well_choices() if not core.is_real_well(w)]
+        synth = vc.synthetic_well_ids()
         st.session_state["well_id"] = ("well_013" if "well_013" in synth
                                        else (synth[0] if synth else
                                              st.session_state["well_id"]))
@@ -80,22 +103,26 @@ def _snap_well_to_source() -> None:
 # ---- global sidebar ----------------------------------------------------------------
 with st.sidebar:
     st.radio(
-        "Production Data Source", ("real", "synthetic"),
-        format_func=lambda s: ("Real — Colorado DJ Basin (ECMC)" if s == "real"
-                               else "Synthetic (demo fleets)"),
+        "Production Data Source", ("synthetic", "real"),
+        format_func=lambda s: ("Synthetic — demo fleet (full coverage)"
+                               if s == "synthetic"
+                               else "Real — Colorado DJ Basin (ECMC)"),
         key="data_source", on_change=_snap_well_to_source,
-        help="Real = FREE Colorado ECMC public monthly records (DJ Basin "
-             "Niobrara/Codell horizontals) under real state API ids — production "
-             "only. Synthetic = the well_0NN demo fleets with known ground truth "
-             "(production + SCADA + injection surveys).")
+        help="Synthetic = the well_0NN demo fleets with known ground truth and FULL "
+             "coverage (production + SCADA + injection surveys) — every page works on "
+             "every well. Real = FREE Colorado ECMC public monthly records (DJ Basin "
+             "Niobrara/Codell horizontals) under real state API ids — production only "
+             "(no SCADA, no injection surveys).")
     st.caption(
-        "Provenance: real Colorado wells carry monthly production ONLY — no SCADA, "
-        "no injection surveys. The SCADA (esp) and injection (gla) fleets are "
-        "synthetic well_0NN wells sharing the registry identity.")
+        f"This source scopes the Well list below ({len(_choices)} wells). Synthetic "
+        "wells carry production + SCADA + injection; real Colorado wells carry monthly "
+        "production only, so the Failure-Risk and Gas-Lift lenses stay honestly "
+        "unavailable for them.")
 
     st.selectbox("Well", _choices, key="well_id", format_func=core.well_label,
                  help="Drives every page — Decline & EUR, Failure Risk, Gas-Lift "
-                      "Optimum, and the Case File all follow this selection.")
+                      "Optimum, and the Case File all follow this selection. Pick any "
+                      "well here, in the Well Browser, or on the per-lens pages.")
 
     st.markdown("**Price Deck**")
     st.number_input("Oil Price ($/bbl)", min_value=0.0, max_value=500.0, step=5.0,
@@ -117,11 +144,18 @@ with st.sidebar:
 
 # ---- navigation ----------------------------------------------------------------------
 def _page(title: str, icon: str, module_name: str, default: bool = False) -> st.Page:
-    import importlib
+    """Build a nav page whose view module is imported LAZILY — only when that page is
+    the active one. Passing ``view.render`` directly would import every view module
+    (plotly + each page's deps) on every cold server start; this closure defers each
+    import until first navigation to that page (audit: 'app.py eagerly imports every
+    view module'). Title/icon/url are explicit so st.Page needs nothing from the
+    callable's source."""
+    def _run(_m=module_name):
+        import importlib
+        importlib.import_module(f"views.{_m}").render()
 
-    view = importlib.import_module(f"views.{module_name}")
-    return st.Page(view.render, title=title, icon=icon,
-                   url_path=module_name, default=default)
+    _run.__name__ = module_name
+    return st.Page(_run, title=title, icon=icon, url_path=module_name, default=default)
 
 
 _nav: dict[str, list[st.Page]] = {}

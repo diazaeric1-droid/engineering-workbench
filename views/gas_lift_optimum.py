@@ -7,6 +7,7 @@ closed-form optimum Qinj* = ln[(q_max − q_sl)·a·(1−wc)·price·nri / gas_c
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -15,6 +16,16 @@ import product_theme as pt
 import theme
 
 from views import _common
+
+
+def _sync_gl_well() -> None:
+    """Drive the GLOBAL selection from the in-page gas-lift picker. Gas-lift wells
+    are always synthetic, so also align the data source so the sidebar selectbox
+    keeps the pick (callback runs before the next run's widgets, so this is legal)."""
+    pick = st.session_state.get("gl_pick")
+    if pick:
+        st.session_state["data_source"] = "synthetic"
+        st.session_state["well_id"] = pick
 
 
 def render() -> None:
@@ -28,20 +39,35 @@ def render() -> None:
         "20-well synthetic gas-lift fleet with embedded injection surveys and known "
         "ground-truth optima.")
 
-    oil_price, nri, _disc = _common.deck()
-    gas_cost = float(st.session_state.setdefault("gas_cost", 1.50))
-    gas_cost = st.slider("Injection Gas Cost ($/Mscf)", 0.25, 6.0, gas_cost, 0.25,
-                         key="gas_cost")
-
     fleet = _common.gla_fleet_cached()
-    wid = _common.current_well()
-    if wid not in fleet:
-        pt.empty_state(
-            f"{wid} has no injection-survey data — the gas-lift lens needs the "
-            "synthetic injection fleet (well_001–well_020). Real Colorado monthly "
-            "filings carry no injection surveys.",
-            "Pick a well with the Injection flag in the Well Browser.")
+    inj_wells = sorted(fleet)
+    if not inj_wells:
+        pt.empty_state("The synthetic gas-lift fleet is unavailable — re-run "
+                       "bootstrap to regenerate the injection surveys.")
         return
+
+    # ---- in-page well picker (request #3b): always lands on an analyzable well ---
+    glob = _common.current_well()
+    target = (glob if glob in fleet
+              else ("well_013" if "well_013" in fleet else inj_wells[0]))
+    c_well, c_gas = st.columns([2, 1])
+    with c_well:
+        st.session_state["gl_pick"] = target  # keep picker synced to global
+        wid = st.selectbox(
+            "Well (gas-lift injection fleet)", inj_wells, key="gl_pick",
+            format_func=core.well_label, on_change=_sync_gl_well,
+            help="The gas-lift lens needs injection-survey data — only the synthetic "
+                 "fleet (well_001–well_020) carries it. Picking here retargets the "
+                 "rest of the workbench too.")
+    with c_gas:
+        st.session_state.setdefault("gas_cost", 1.50)
+        gas_cost = st.slider("Injection Gas Cost ($/Mscf)", 0.25, 6.0, step=0.25,
+                             key="gas_cost")
+    oil_price, nri, _disc = _common.deck()
+    if glob not in fleet:
+        st.caption(f"The globally selected well has no injection survey, so this page "
+                   f"is showing **{core.well_label(wid)}**. Pick another above to "
+                   "compare.")
 
     df_w = fleet[wid]
     params, wc, cur_inj, opt = core.analyze_gla_well(df_w, oil_price, gas_cost, nri)
@@ -109,10 +135,13 @@ def render() -> None:
             marker=dict(color=theme.AMBER, size=10, symbol="diamond")))
         fig_glpc.update_layout(title="Gas-Lift Performance Curve",
                                xaxis_title="Injection gas (Mscfd)",
-                               yaxis_title="Gross liquid (bopd)")
+                               yaxis_title="Gross liquid (blpd)")
         st.plotly_chart(theme.style_fig(fig_glpc, height=330), width="stretch")
-        theme.source_note(f"q_sl={params.q_sl:.0f} bopd · q_max={params.q_max:.0f} "
-                          f"bopd · a={params.a:.3f} Mscfd⁻¹ (nonlinear least squares).")
+        theme.source_note(
+            f"GLPC is fit on GROSS LIQUID (oil + water): q_sl={params.q_sl:.0f} blpd · "
+            f"q_max={params.q_max:.0f} blpd · a={params.a:.3f} Mscfd⁻¹ (nonlinear least "
+            f"squares). Oil = liquid × (1 − WC), WC={wc:.0%}; the economics below convert "
+            "liquid → oil before pricing.")
     with col_right:
         net_rev = core.gla_glpc.net_revenue_daily(q_range, params, wc,
                                                   oil_price, gas_cost, nri)
@@ -139,6 +168,47 @@ def render() -> None:
         theme.source_note(
             "Net revenue = BOPD × (1 − WC) × price × NRI − Qinj × gas_cost; optimum "
             "from dNet/dQinj = 0 (closed form, no search).")
+
+    # ---- fit validation vs known ground truth -----------------------------------
+    truth = core.gla_ground_truth()
+    if wid in getattr(truth, "index", []):
+        t = truth.loc[wid]
+        pt.section("Fit Validation — Recovered Vs. Known Ground Truth",
+                   "This synthetic fleet ships the generator's TRUE GLPC parameters, "
+                   "so the live fit is checked directly — parameter recovery, not a "
+                   "claim about the live-deck optimum.")
+        spec = [("q_sl (blpd)", params.q_sl, float(t["q_sl"]), 1),
+                ("q_max (blpd)", params.q_max, float(t["q_max"]), 1),
+                ("a (Mscfd⁻¹)", params.a, float(t["a"]), 3),
+                ("Water cut", wc, float(t["water_cut"]), 3)]
+        val_df = pd.DataFrame([
+            {"Parameter": name, "Fitted": round(fv, nd), "True": round(tv, nd),
+             "Error %": (round((fv - tv) / tv * 100, 1) if tv else float("nan"))}
+            for name, fv, tv, nd in spec])
+        true_params = core.gla_glpc.GLPCParams(
+            q_sl=float(t["q_sl"]), q_max=float(t["q_max"]), a=float(t["a"]))
+        true_opt = core.gla_glpc.optimal_injection(
+            true_params, float(t["water_cut"]), oil_price, gas_cost, nri)
+        opt_abs_err = abs(opt.q_inj_opt - true_opt.q_inj_opt)
+        cval, ckpi = st.columns([3, 2])
+        with cval:
+            st.dataframe(val_df, width="stretch", hide_index=True,
+                         column_config={"Error %": st.column_config.NumberColumn(
+                             format="%.1f%%")})
+        with ckpi:
+            pt.kpi_row([
+                {"label": "Optimum (fitted)", "value": f"{opt.q_inj_opt:.2f} Mscfd"},
+                {"label": "Optimum (true params)",
+                 "value": f"{true_opt.q_inj_opt:.2f} Mscfd",
+                 "delta": f"{opt.q_inj_opt - true_opt.q_inj_opt:+.2f}"},
+            ])
+            st.caption(f"At the current deck the fitted-curve optimum lands within "
+                       f"**{opt_abs_err:.2f} Mscfd** of the optimum from the TRUE "
+                       "parameters — fit error barely moves the recommendation.")
+        theme.source_note(
+            "Parameter recovery vs. the generator's committed ground_truth.csv; the "
+            "optimum comparison recomputes both at the SAME live deck, isolating fit "
+            "error from economic assumptions.")
 
     pt.section("Recommendation")
     rec_kind = {"Reduce": "bad", "Increase": "warn", "Maintain": "ok"}[direction]

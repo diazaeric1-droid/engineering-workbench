@@ -61,8 +61,8 @@ APP_DIRS = {
 # Absorbed component versions (see VENDORING.md). pec's pyproject is the source of
 # truth for its version (its src/__init__ lags at 0.9.0).
 COMPONENT_VERSIONS = {
-    "well-performance-studio": "0.2.2",
-    "production-engineer-copilot": "0.9.2",
+    "well-performance-studio": "0.2.3",  # lift.py: visc-corrected pump curve, freq-scaled
+    "production-engineer-copilot": "0.9.2",  # runout, stage cap, gas-lift econ/rollover
     "esp-failure-risk-agent": "0.7.3",
     "well-gas-lift-advisor": "0.1.0",
 }
@@ -148,9 +148,21 @@ esp_oracle = importlib.import_module("esp.oracle")
 gla_glpc = importlib.import_module("gla.glpc")
 gla_econ_core = importlib.import_module("gla.econ_core")
 
-# pec.agent imports anthropic/rich/dotenv at module top — all pinned in
-# requirements.txt, so an eager import keeps the AI Well Review path one-hop.
-pec_agent = importlib.import_module("pec.agent")
+# pec.agent imports anthropic/rich/dotenv at module top — a comparatively slow
+# import that ONLY the (BYOK) AI Well Review path needs. Load it lazily via
+# pec_agent() so it never taxes cold start / first paint (perf: change #0).
+_pec_agent_mod = None
+
+
+def pec_agent():
+    """Lazily import and return pec.agent (the anthropic-backed AI Well Review).
+
+    Kept off the cold path — every deterministic page renders without it, so the
+    anthropic/rich import only happens the first time a user runs the AI review."""
+    global _pec_agent_mod
+    if _pec_agent_mod is None:
+        _pec_agent_mod = importlib.import_module("pec.agent")
+    return _pec_agent_mod
 
 # ---- canonical data paths ----------------------------------------------------
 PEC_SYNTH_DIR = APP_DIRS["pec"] / "data" / "synthetic"
@@ -311,16 +323,39 @@ def esp_fleet() -> dict[str, "object"]:
     return esp_loader.load_fleet(ESP_DATA)
 
 
-def esp_scores():
-    """(probs descending pd.Series, SHAP contribs DataFrame) for the whole ESP fleet."""
-    fleet = esp_fleet()
-    features = esp_features.featurize_fleet(fleet)
-    model = esp_model.ESPRiskModel.load(ESP_MODEL)
+def esp_scores(model=None, features=None):
+    """(probs descending pd.Series, SHAP contribs DataFrame) for the whole ESP fleet.
+
+    Accepts an already-loaded ``model`` and ``features`` so the Streamlit layer can
+    reuse its caches (esp_model_cached / esp_features_cached) instead of re-loading
+    the joblib and re-featurizing the 100-well fleet on every risk page (perf #0)."""
     import pandas as pd
+    if features is None:
+        features = esp_features.featurize_fleet(esp_fleet())
+    if model is None:
+        model = esp_model.ESPRiskModel.load(ESP_MODEL)
     probs = pd.Series(model.predict_proba(features), index=features.index,
                       name="risk").sort_values(ascending=False)
     contribs = model.feature_contributions(features)
     return probs, contribs
+
+
+_gla_truth_cache = None
+
+
+def gla_ground_truth():
+    """Committed gas-lift ground-truth table indexed by well_id (cached).
+
+    Columns: q_sl, q_max, a, water_cut, true_opt_inj, current_inj, over_injected —
+    the generator's KNOWN parameters/optimum per injection well. The Gas-Lift Optimum
+    view uses this to show fit-vs-truth (parameter recovery), the page's strongest
+    demonstrable claim. Returns an empty frame if the artifact is absent."""
+    global _gla_truth_cache
+    if _gla_truth_cache is None:
+        import pandas as pd
+        _gla_truth_cache = (pd.read_csv(GLA_GROUND_TRUTH).set_index("well_id")
+                            if GLA_GROUND_TRUTH.exists() else pd.DataFrame())
+    return _gla_truth_cache
 
 
 # ---- injection wells (gla) -------------------------------------------------------
@@ -395,7 +430,7 @@ def blind_holdout_note() -> str:
 
 # ---- merged well index (the Fleet → Well Browser backbone) -----------------------
 
-def well_index():
+def well_index(probs=None):
     """One row per well across ALL data domains, merged by well_id with availability
     flags. Identity comes from the shared fleet_registry for synthetic ``well_0NN``
     wells, and from the (real) WellFile header for Colorado wells.
@@ -403,7 +438,9 @@ def well_index():
     DATA-IDENTITY GUARANTEE: real Colorado wells carry has_scada=False and
     has_injection=False — the synthetic SCADA / injection fleets share the well_0NN
     namespace only, and nothing here ever joins them onto a real well id.
-    """
+
+    ``probs`` (an ESP-risk Series) may be passed in so the Streamlit layer can reuse
+    its cached scores instead of recomputing them here (perf #0)."""
     import pandas as pd
     sys.path.insert(0, str(HERE)) if str(HERE) not in sys.path else None
     import fleet_registry
@@ -413,10 +450,11 @@ def well_index():
     scada = esp_fleet()
     inj = gla_fleet()
 
-    try:
-        probs, _ = esp_scores()
-    except Exception:  # noqa: BLE001 — model not bootstrapped yet
-        probs = {}
+    if probs is None:
+        try:
+            probs, _ = esp_scores()
+        except Exception:  # noqa: BLE001 — model not bootstrapped yet
+            probs = {}
 
     rows = []
     for api_id, w in sorted(co.items()):
@@ -475,3 +513,258 @@ def availability(well_id: str) -> dict:
         "scada": (not is_real_well(well_id)) and (ESP_DATA / f"{well_id}.csv").exists(),
         "injection": (not is_real_well(well_id)) and (GLA_FLEET_DIR / f"{well_id}.csv").exists(),
     }
+
+
+# ---- per-well DESIGN SEED (the Design section's anchor to the selected well) ------
+# The Nodal / Lift / PVT pages are forward-design what-ifs, but their inputs should be
+# SEEDED from the selected well instead of generic slider constants (audit: nodal/lift
+# "ignore the selected well"). The honest move a senior PE expects is to seed every
+# input from the well's OWN data where it exists and flag the rest as engineering
+# assumptions: water cut / GLR / GOR / current rates / (ESP) intake pressure & drive
+# frequency are MEASURED in the well file; bubble point / fluid viscosity / BHT are
+# DERIVED from those via standard correlations; reservoir pressure / depth / API /
+# tubing ID / WHP are ASSUMED from formation-typical values (no public field gives
+# them). `well_design_seed` returns all of it plus a per-field provenance map so the
+# view can render a measured-vs-assumed table — not a fabricated per-well result.
+
+from dataclasses import dataclass as _dc, field as _dc_field  # noqa: E402
+
+
+# Formation-typical reservoir context (TVD ft, oil API, pressure gradient psi/ft).
+# Used ONLY to seed ASSUMED inputs the public well file does not carry; clearly
+# labeled "assumed (formation-typical)" in the seed provenance. Permian + DJ Basin +
+# a GoM/other fallback. Values are representative midpoints from public basin studies.
+_FORMATION_CONTEXT = {
+    "spraberry":   (8200.0, 38.0, 0.46),
+    "wolfcamp a":  (9500.0, 40.0, 0.52),
+    "wolfcamp b":  (9800.0, 41.0, 0.52),
+    "wolfcamp c":  (10000.0, 41.0, 0.52),
+    "wolfcamp":    (9500.0, 40.0, 0.50),
+    "bone spring": (10500.0, 42.0, 0.50),
+    "avalon":      (9200.0, 42.0, 0.49),
+    "san andres":  (5000.0, 32.0, 0.43),
+    "grayburg":    (4600.0, 33.0, 0.43),
+    "clearfork":   (6200.0, 36.0, 0.45),
+    "niobrara":    (7000.0, 42.0, 0.45),
+    "codell":      (7200.0, 41.0, 0.45),
+    "pliocene":    (9000.0, 28.0, 0.46),  # GoM-style, heavier oil
+    "miocene":     (11000.0, 30.0, 0.47),
+}
+_FORMATION_DEFAULT = (8000.0, 38.0, 0.47)
+
+
+def _formation_context(formation: str) -> tuple[float, float, float]:
+    """(TVD ft, API, gradient psi/ft) for a formation name, with a sane default."""
+    key = (formation or "").strip().lower()
+    if key in _FORMATION_CONTEXT:
+        return _FORMATION_CONTEXT[key]
+    for name, ctx in _FORMATION_CONTEXT.items():  # loose contains-match
+        if name in key or key in name:
+            return ctx
+    return _FORMATION_DEFAULT
+
+
+def _standing_bubble_point(gor_scf_stb: float, gas_sg: float, api: float,
+                           temp_f: float) -> float:
+    """Bubble-point pressure (psia), Standing (1947) — the inverse of the Rs
+    correlation wps.nodal uses. Pb = 18.2·[(Rs/γg)^0.83·10^(0.00091·T−0.0125·API) − 1.4]."""
+    rs = max(float(gor_scf_stb), 1.0)
+    sg = max(float(gas_sg), 0.55)
+    a = 0.00091 * float(temp_f) - 0.0125 * float(api)
+    pb = 18.2 * ((rs / sg) ** 0.83 * 10.0 ** a - 1.4)
+    return float(pb)
+
+
+@_dc
+class WellDesignSeed:
+    """Per-well seed for the Design section (nodal / lift / PVT), with provenance.
+
+    Every numeric field is paired with an entry in ``provenance`` whose value is one of
+    ``"measured"`` (read from the well's own production/SCADA data), ``"derived"``
+    (computed from measured values via a standard correlation), or ``"assumed"``
+    (formation-typical engineering estimate — the public well file does not carry it).
+    The Design views pre-fill their sliders from this and surface the provenance map so
+    the operating point is an honest what-if anchored to the selected well, not a generic
+    default mislabeled with the well's name.
+    """
+
+    well_id: str
+    name: str
+    lift_type: str
+    formation: str
+    source: str  # 'synthetic' | 'real'
+    has_production: bool
+    # reservoir / IPR
+    reservoir_pressure_psia: float
+    bubble_point_psia: float
+    test_rate_stb_d: float
+    test_pwf_psia: float
+    # wellbore / completion
+    depth_ft: float
+    pump_depth_ft: float
+    tubing_id_in: float
+    wellhead_pressure_psia: float
+    # fluids
+    water_cut_frac: float
+    glr_scf_stb: float
+    gor_scf_stb: float
+    oil_api: float
+    gas_sg: float
+    water_sg: float
+    temp_surface_f: float
+    temp_bottom_f: float
+    fluid_viscosity_cp: float
+    # current state (measured latest)
+    current_oil_bopd: float
+    current_water_bwpd: float
+    current_gas_mcfd: float
+    # ESP telemetry (measured, where present)
+    esp_frequency_hz: float | None
+    esp_intake_psi: float | None
+    provenance: dict = _dc_field(default_factory=dict)
+
+
+def well_design_seed(well_id: str) -> WellDesignSeed:
+    """Build a :class:`WellDesignSeed` for ``well_id`` from its own data + correlations.
+
+    Measured where the well file has it (water cut, GLR/GOR, current rates, ESP intake
+    pressure & drive frequency), derived where a standard correlation applies (bubble
+    point via Standing; BHT from a geothermal gradient; live-oil viscosity), and assumed
+    from formation-typical values otherwise (reservoir pressure, depth, API, tubing ID,
+    wellhead pressure). Always returns a usable seed — falls back to registry identity +
+    formation typicals for SCADA-only wells with no production file.
+    """
+    prov: dict[str, str] = {}
+    real = is_real_well(well_id)
+    source = "real" if real else "synthetic"
+
+    # identity + formation
+    if real:
+        w = colorado_wells().get(well_id)
+        name = w.well_id if w else well_id
+        formation = (w.completion.get("formation", "") if w else "") or "—"
+        lift_type = (w.artificial_lift.get("type", "") if w else "") or "—"
+    else:
+        try:
+            sys.path.insert(0, str(HERE)) if str(HERE) not in sys.path else None
+            import fleet_registry
+            meta = fleet_registry.get(well_id)
+            name, formation, lift_type = meta.name, meta.formation, meta.lift
+        except Exception:  # noqa: BLE001
+            name, formation, lift_type = well_id, "—", "—"
+        w = pec_synthetic_wells().get(well_id)
+
+    depth_typ, api_typ, grad_typ = _formation_context(formation)
+
+    # --- assumed (formation-typical) reservoir/wellbore context ---
+    depth_ft = float(depth_typ);          prov["depth_ft"] = "assumed"
+    oil_api = float(api_typ);             prov["oil_api"] = "assumed"
+    reservoir_pressure_psia = float(depth_ft * grad_typ); prov["reservoir_pressure_psia"] = "assumed"
+    gas_sg = 0.75;                        prov["gas_sg"] = "assumed"
+    water_sg = 1.05;                      prov["water_sg"] = "assumed"
+    wellhead_pressure_psia = 150.0;       prov["wellhead_pressure_psia"] = "assumed"
+
+    # --- measured current state + fluids (from the well's own production history) ---
+    # Use the most recent PRODUCING record, not literally hist[-1]: real wells often end
+    # in a shut-in tail (oil=water=0). Taking the zero record would silently fall back to
+    # the assumed water cut / floored GOR yet still label them "measured" — fabricating the
+    # very provenance the seed exists to keep honest. Skip back to the last positive-liquid
+    # month; if the well never produced liquid, treat it as no-production.
+    hist = w.production_history if w is not None else []
+    last = next((r for r in reversed(hist)
+                 if (float(r.get("oil_bopd", 0.0) or 0.0)
+                     + float(r.get("water_bwpd", 0.0) or 0.0)) > 0), None)
+    if last is not None:
+        oil = float(last.get("oil_bopd", 0.0) or 0.0)
+        water = float(last.get("water_bwpd", 0.0) or 0.0)
+        gas_mcfd = float(last.get("gas_mcfd", 0.0) or 0.0)
+        liq = oil + water
+        water_cut = float(water / liq) if liq > 0 else 0.30
+        gor = float(gas_mcfd * 1000.0 / oil) if oil > 0 else 0.0
+        glr = float(gas_mcfd * 1000.0 / liq) if liq > 0 else 0.0
+        prov["water_cut_frac"] = "measured"
+        prov["gor_scf_stb"] = "derived"
+        prov["glr_scf_stb"] = "derived"
+        prov["current_oil_bopd"] = prov["current_water_bwpd"] = "measured"
+        prov["current_gas_mcfd"] = "measured"
+    else:
+        oil = water = gas_mcfd = liq = 0.0
+        water_cut, gor, glr = 0.30, 400.0, 400.0
+        prov["water_cut_frac"] = prov["gor_scf_stb"] = prov["glr_scf_stb"] = "assumed"
+        prov["current_oil_bopd"] = prov["current_water_bwpd"] = prov["current_gas_mcfd"] = "n/a"
+    water_cut = float(min(max(water_cut, 0.0), 0.99))
+    gor = float(min(max(gor, 50.0), 5000.0))
+    glr = float(min(max(glr, 50.0), 5000.0))
+
+    # --- derived (correlations from measured/assumed) ---
+    temp_surface_f = 100.0; prov["temp_surface_f"] = "assumed"
+    temp_bottom_f = float(70.0 + 0.013 * depth_ft)  # ~1.3 degF/100 ft geothermal
+    prov["temp_bottom_f"] = "derived"
+    bubble_point_psia = _standing_bubble_point(gor, gas_sg, oil_api, temp_bottom_f)
+    bubble_point_psia = float(min(max(bubble_point_psia, 200.0), reservoir_pressure_psia))
+    prov["bubble_point_psia"] = "derived"
+    try:
+        # Evaluate at the bubble point: _live_oil_visc is the SATURATED correlation (it
+        # dissolves Rs at the pressure passed in). At reservoir pressure (p > Pb) it would
+        # over-dissolve gas vs the well's actual GOR and read too low; the bubble point is
+        # where dissolved gas is consistent with the produced GOR.
+        mu = wps_nodal._live_oil_visc(bubble_point_psia, temp_bottom_f,
+                                      oil_api, gas_sg)
+        fluid_viscosity_cp = float(min(max(mu, 1.0), 300.0))
+    except Exception:  # noqa: BLE001
+        fluid_viscosity_cp = 5.0
+    prov["fluid_viscosity_cp"] = "derived"
+
+    # tubing ID: 2-7/8" by default, 3-1/2" for higher-rate wells (assumed)
+    tubing_id_in = 2.992 if (oil + water) > 800.0 else 2.441
+    prov["tubing_id_in"] = "assumed"
+    pump_depth_ft = float(max(depth_ft - 500.0, 100.0))
+    prov["pump_depth_ft"] = "assumed"
+
+    # --- IPR test point: prefer a MEASURED ESP suction reading, else a producing point ---
+    esp_freq = esp_intake = None
+    esp_readings = getattr(w, "esp_readings", None) if w is not None else None
+    if esp_readings:
+        r = esp_readings[-1]
+        esp_freq = float(r.get("frequency_hz", 0.0) or 0.0) or None
+        esp_intake = float(r.get("intake_pressure_psi", 0.0) or 0.0) or None
+        bfpd = float(r.get("bfpd", 0.0) or 0.0)
+        # anchor the IPR to the measured (rate, suction pressure) point; project the
+        # intake pressure down to the perfs by the static fluid gradient (intake is set
+        # above the perforations).
+        if bfpd > 0 and esp_intake:
+            grad = 0.433 * ((1 - water_cut) * (141.5 / (131.5 + oil_api))
+                            + water_cut * water_sg)
+            test_rate_stb_d = float(bfpd)
+            test_pwf_psia = float(min(esp_intake + grad * (depth_ft - pump_depth_ft),
+                                      reservoir_pressure_psia - 50.0))
+            prov["test_rate_stb_d"] = "measured"
+            prov["test_pwf_psia"] = "derived"
+        else:
+            test_rate_stb_d = float(liq) if liq > 0 else 600.0
+            test_pwf_psia = float(0.5 * reservoir_pressure_psia)
+            prov["test_rate_stb_d"] = "measured" if liq > 0 else "assumed"
+            prov["test_pwf_psia"] = "assumed"
+    else:
+        test_rate_stb_d = float(liq) if liq > 0 else 600.0
+        test_pwf_psia = float(0.5 * reservoir_pressure_psia)
+        prov["test_rate_stb_d"] = "measured" if liq > 0 else "assumed"
+        prov["test_pwf_psia"] = "assumed"
+
+    return WellDesignSeed(
+        well_id=well_id, name=name, lift_type=lift_type, formation=formation,
+        source=source, has_production=bool(hist),
+        reservoir_pressure_psia=reservoir_pressure_psia,
+        bubble_point_psia=bubble_point_psia,
+        test_rate_stb_d=test_rate_stb_d, test_pwf_psia=test_pwf_psia,
+        depth_ft=depth_ft, pump_depth_ft=pump_depth_ft,
+        tubing_id_in=tubing_id_in, wellhead_pressure_psia=wellhead_pressure_psia,
+        water_cut_frac=water_cut, glr_scf_stb=glr, gor_scf_stb=gor,
+        oil_api=oil_api, gas_sg=gas_sg, water_sg=water_sg,
+        temp_surface_f=temp_surface_f, temp_bottom_f=temp_bottom_f,
+        fluid_viscosity_cp=fluid_viscosity_cp,
+        current_oil_bopd=float(oil), current_water_bwpd=float(water),
+        current_gas_mcfd=float(gas_mcfd),
+        esp_frequency_hz=esp_freq, esp_intake_psi=esp_intake,
+        provenance=prov,
+    )

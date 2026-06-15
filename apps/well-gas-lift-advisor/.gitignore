@@ -12,9 +12,9 @@ venv/
 .env
 *.pyc
 
-# generated data (re-run generate_fleet.py to restore)
-data/synthetic/fleet/
-data/synthetic/ground_truth.csv
+# Workbench vendoring (v0.2.0): the synthetic gas-lift fleet + ground truth are
+# COMMITTED (deterministic seed 42) so the product needs no first-run generation.
+#   (was ignored: data/synthetic/fleet/  ·  data/synthetic/ground_truth.csv)
 
 # evals output
 evals/optimization_report.json

@@ -20,7 +20,11 @@ jobs:
           pip install -U pip
           pip install -r requirements.txt
           pip install pytest
-      - name: Bootstrap (regenerate gitignored synthetic data + train the ESP model)
-        run: python -c "import core; core.bootstrap()"
+      # No explicit bootstrap step: the deterministic artifacts (ESP model + SCADA, the
+      # gas-lift fleet) are COMMITTED, so a fresh checkout already has them. pytest's
+      # session-scoped fixture calls core.bootstrap() once — idempotent, a fast no-op on
+      # the committed artifacts (and a self-healing retrain only if one won't load). This
+      # also makes CI exercise the real committed-artifact cold path instead of masking a
+      # cold-start regression behind a pre-train step (audit: 'CI bootstraps twice').
       - name: Tests
         run: python -m pytest -q

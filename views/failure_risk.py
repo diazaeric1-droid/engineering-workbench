@@ -7,6 +7,8 @@ telemetry, so real Colorado wells are honestly un-scorable).
 """
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -17,6 +19,16 @@ import product_theme as pt
 import theme
 
 from views import _common
+
+
+def _sync_esp_well() -> None:
+    """Drive the GLOBAL selection from the in-page picker. Scorable wells are always
+    synthetic SCADA wells, so align the data source too (callback runs before the
+    next run's widgets, so writing these widget keys is legal)."""
+    pick = st.session_state.get("fr_pick")
+    if pick:
+        st.session_state["data_source"] = "synthetic"
+        st.session_state["well_id"] = pick
 
 
 def _shap_panel(well_id: str, features, contribs) -> None:
@@ -85,6 +97,7 @@ def render() -> None:
         last = scada.iloc[-1] if scada is not None and len(scada) else None
         rows.append({
             "Well": well_id,
+            "High?": bool(float(probs[well_id]) >= threshold),
             "Registry Lift": meta.lift,
             "Basin · Formation": f"{meta.basin} · {meta.formation}",
             "30-Day Risk": round(float(probs[well_id]), 4),
@@ -94,32 +107,74 @@ def render() -> None:
             "Motor Amps": round(float(last["motor_amps"]), 1) if last is not None else None,
         })
     table = pd.DataFrame(rows)
-    st.dataframe(table, width="stretch", hide_index=True, height=380,
-                 column_config={"30-Day Risk": st.column_config.ProgressColumn(
-                     "30-Day Risk", min_value=0.0, max_value=1.0, format="%.2f")})
+    # The threshold slider now actually DRIVES the table (audit: it only fed one KPI):
+    # a High? flag column + an optional filter to the high-risk subset.
+    only_high = st.checkbox(f"Show only wells at or above the {threshold:.0%} threshold",
+                            value=False, key="fr_only_high")
+    view_tbl = table[table["High?"]] if only_high else table
+    st.dataframe(view_tbl, width="stretch", hide_index=True, height=380,
+                 column_config={
+                     "High?": st.column_config.CheckboxColumn(
+                         f"High (≥{threshold:.0%})", disabled=True),
+                     "30-Day Risk": st.column_config.ProgressColumn(
+                         "30-Day Risk", min_value=0.0, max_value=1.0, format="%.2f")})
     st.download_button("Download Risk Table (CSV)", data=table.to_csv(index=False),
                        file_name="workbench_esp_risk.csv", mime="text/csv")
     theme.source_note(
         "Calibrated (Platt) 30-day failure probabilities from the class-weighted "
-        "XGBoost model; suspected mode from the deterministic failure-mode "
-        "classifier. The fleet is synthetic — registry identity is illustrative.")
+        "XGBoost model; suspected mode from the deterministic failure-mode classifier. "
+        "Note the column basis differs: 30-Day Risk is a WINDOWED-aggregate model score "
+        "(features summarize a trailing telemetry window), while Latest BFPD / Intake / "
+        "Motor Amps are the SINGLE most-recent SCADA reading shown for context. The "
+        "fleet is synthetic — registry identity is illustrative.")
+
+    # ---- operational model performance (out-of-fold) ----------------------------
+    if core.ESP_TRAINING_REPORT.exists():
+        try:
+            tr = json.loads(core.ESP_TRAINING_REPORT.read_text())
+            pt.section("Model Performance (Out-Of-Fold CV)",
+                       "How the shipped classifier scores on held-out folds — the "
+                       "numbers behind the risk table, not a training-set echo.")
+            pt.kpi_row([
+                {"label": "OOF AUROC", "value": f"{tr['auroc_cv_mean']:.3f}",
+                 "delta": f"±{tr['auroc_cv_std']:.3f} across folds",
+                 "delta_color": "off"},
+                {"label": "Precision @ Top 10%",
+                 "value": f"{tr['precision_at_top10pct']:.0%}",
+                 "help": "Of the top-decile risk calls, the share that truly failed"},
+                {"label": "Recall @ Top 10%",
+                 "value": f"{tr['recall_at_top10pct']:.0%}",
+                 "help": "Of all true failures, the share landing in the top decile"},
+                {"label": "Brier Score", "value": f"{tr['brier']:.3f}",
+                 "help": "Mean-squared probability error — lower is better"},
+                {"label": "Failures / Wells",
+                 "value": f"{tr['n_positives']} / {tr['n_wells']}"},
+            ])
+        except Exception:  # noqa: BLE001 — report unreadable; the page still works
+            pass
 
     # ---- per-well drivers ---------------------------------------------------------
-    wid = _common.current_well()
-    pt.section("Per-Well Risk Drivers")
-    if wid in features.index:
-        st.metric(f"30-Day Failure Probability — {wid}", f"{float(probs[wid]):.0%}")
-        _shap_panel(wid, features, contribs)
+    pt.section("Per-Well Risk Drivers",
+               "Pick any scorable well — defaults to your global selection when it "
+               "has SCADA, otherwise the fleet's top-risk well.")
+    scorable = [str(w) for w in probs.index]  # already sorted by descending risk
+    glob = _common.current_well()
+    target = glob if glob in features.index else (scorable[0] if scorable else glob)
+    if scorable:
+        st.session_state["fr_pick"] = target
+        wid = st.selectbox(
+            "Well (scorable SCADA fleet)", scorable, key="fr_pick",
+            format_func=lambda w: f"{w} · {fleet_registry.get(w).name} "
+                                  f"— {float(probs[w]):.0%}",
+            on_change=_sync_esp_well)
     else:
-        pt.empty_state(
-            f"{wid} is not scorable — the failure-risk lens needs fleet SCADA, "
-            "which only the synthetic well_0NN fleet carries (real monthly filings "
-            "have no pump telemetry).",
-            "Top-risk well shown below instead.")
-        top = str(probs.index[0])
-        st.metric(f"30-Day Failure Probability — {top} (fleet top risk)",
-                  f"{float(probs.iloc[0]):.0%}")
-        _shap_panel(top, features, contribs)
+        wid = target
+    if glob not in features.index:
+        st.caption(f"The globally selected well has no SCADA telemetry, so this "
+                   f"section is showing **{wid}**. Real monthly filings carry no "
+                   "pump data — switch to a synthetic well for per-well drivers.")
+    st.metric(f"30-Day Failure Probability — {wid}", f"{float(probs[wid]):.0%}")
+    _shap_panel(wid, features, contribs)
     theme.references(["shap"])
 
     # ---- reliability -----------------------------------------------------------
@@ -127,8 +182,9 @@ def render() -> None:
     reliability = getattr(model, "reliability", None)
     if reliability:
         pt.section("Calibration — Do The Probabilities Mean What They Say?",
-                   "Out-of-fold reliability diagram; points near the diagonal mean "
-                   "a 30% score fails ~30% of the time.")
+                   "Out-of-fold reliability of the RAW booster (before Platt "
+                   "calibration); points near the diagonal mean a 30% score fails "
+                   "~30% of the time. The shipped scores apply Platt on top.")
         rel_df = pd.DataFrame(reliability)
         rfig = go.Figure()
         rfig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines",
@@ -143,8 +199,9 @@ def render() -> None:
         st.plotly_chart(theme.style_fig(rfig, height=300), width="stretch")
         theme.source_note(
             "Mean predicted probability vs. observed failure frequency, binned, from "
-            "out-of-fold cross-validation (Platt-calibrated); marker size ∝ wells in "
-            "bin.")
+            "out-of-fold cross-validation of the raw XGBoost booster (the OOF curve is "
+            "computed before Platt calibration); marker size ∝ wells in bin. The "
+            "fleet risk table applies Platt calibration on top of this booster.")
 
     # ---- oracle ceiling -----------------------------------------------------------
     oc = _common.oracle_cached()

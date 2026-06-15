@@ -64,7 +64,10 @@ def _run_view(module_name: str, well_id: str, repo: str, extra_state: dict):
     st.session_state.setdefault("oil_price", 70.0)
     st.session_state.setdefault("nri", 0.80)
     st.session_state.setdefault("discount", 0.10)
-    st.session_state.setdefault("data_source", "real")
+    st.session_state.setdefault("gas_cost", 1.50)
+    # keep the data source coherent with the well under test (real CO id vs synthetic)
+    st.session_state["data_source"] = ("real" if str(well_id).startswith("05-")
+                                       else "synthetic")
     st.session_state.setdefault("anthropic_key", "")
     st.session_state["well_id"] = well_id
     for k, v in (extra_state or {}).items():
@@ -106,23 +109,33 @@ def test_each_view_renders_on_scada_only_well(module_name):
     assert not at.exception, f"{module_name}: {at.exception}"
 
 
-def test_app_well_switch_and_source_toggle_interaction():
-    """Switching the global well and flipping the data-source radio must rerun
-    cleanly; the source toggle snaps the selection to that source's lead well."""
+def test_app_default_and_source_toggle_filter():
+    """The app opens on the synthetic flagship well; flipping the data-source radio
+    scopes the well universe and snaps the selection to that source's lead well."""
     at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=600).run()
     assert not at.exception
-    at.selectbox(key="well_id").select("well_013")
-    at.run()
-    assert not at.exception
-    assert at.session_state["well_id"] == "well_013"
-    at.radio(key="data_source").set_value("synthetic")
-    at.run()
-    assert not at.exception
-    assert at.session_state["well_id"] == "well_013"  # hero default for synthetic
+    assert at.session_state["data_source"] == "synthetic"   # synthetic is the default
+    assert at.session_state["well_id"] == "well_013"         # synthetic flagship well
     at.radio(key="data_source").set_value("real")
     at.run()
     assert not at.exception
-    assert str(at.session_state["well_id"]).startswith("05-")  # first CO well
+    assert str(at.session_state["well_id"]).startswith("05-")  # snapped to first CO well
+    at.radio(key="data_source").set_value("synthetic")
+    at.run()
+    assert not at.exception
+    assert at.session_state["well_id"] == "well_013"         # snapped back to hero
+
+
+def test_gas_lift_optimum_never_blank_off_domain():
+    """Gas-Lift Optimum must not dead-end when the global well has no injection
+    survey (e.g. a real Colorado well): the in-page picker falls back to an
+    analyzable injection well (request #3b)."""
+    co = sorted(core.colorado_wells())[0]
+    at = AppTest.from_function(
+        _run_view, args=("gas_lift_optimum", co, str(REPO_ROOT), {}),
+        default_timeout=600).run()
+    assert not at.exception, at.exception
+    assert str(at.session_state["gl_pick"]).startswith("well_")
 
 
 def test_case_file_design_lens_renders_after_nodal_session():

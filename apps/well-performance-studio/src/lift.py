@@ -85,6 +85,30 @@ class PumpModel:
         e = self.eff_bep * (1.0 - ((q_ref - self.q_bep_bpd) / self.q_bep_bpd) ** 2)
         return float(np.clip(e, 0.05, self.eff_bep))
 
+    def runout_bpd(self, freq_hz: float | None = None) -> float:
+        """Flow at which head per stage reaches zero, scaled to ``freq_hz``.
+
+        By the affinity laws flow scales linearly with frequency, so the zero-head
+        runout shifts from the 60-Hz value ``q_runout_bpd`` to ``q_runout_bpd·f/f0``.
+        The view uses this to (a) bound the plotted pump-curve x-range to the *selected*
+        frequency and (b) detect a design rate that exceeds the pump's capacity.
+        """
+        f0 = self.freq_base_hz
+        f = f0 if freq_hz is None else float(freq_hz)
+        return float(self.q_runout_bpd * max(f, 1e-6) / f0)
+
+    def head_per_stage_visc(self, q_bpd: float, freq_hz: float | None = None,
+                            visc_cp: float = 1.0) -> float:
+        """Viscosity-corrected head per stage (ft) — the curve the design point lands on.
+
+        Identical to :meth:`head_per_stage` but with the Hydraulic-Institute viscosity
+        head de-rate ``ch`` applied, so the plotted curve and the design-point marker
+        share one correction (audit: 'design point floats off its own curve at high
+        viscosity').
+        """
+        ch, _ = _visc_correction(visc_cp)
+        return float(self.head_per_stage(q_bpd, freq_hz) * ch)
+
 
 def _visc_correction(mu_cp: float) -> tuple[float, float]:
     """Basic viscosity de-rating factors (head, efficiency) for a centrifugal pump.
@@ -119,7 +143,19 @@ class ESPDesign:
     meets_target: bool          # does the design deliver >= target at the operating point
     op_q_stb_d: float           # achieved operating-point rate with the pump installed
     op_pwf_psia: float          # operating-point flowing BHP with the pump installed
+    # ---- feasibility / curve-consistency fields (added for the workbench view) ----
+    head_visc_factor: float = 1.0   # viscosity head de-rate ch applied to head/stage
+    eff_visc_factor: float = 1.0    # viscosity efficiency de-rate ce
+    runout_bpd: float = 0.0         # pump runout (zero-head flow) at the chosen frequency
+    feasible: bool = True           # False when design fluid rate >= pump runout
+    stages_capped: bool = False     # True when stage count was clamped at MAX_STAGES
+    meets_target_tol: float = 0.98  # tolerance the meets_target check uses (fraction)
     notes: str = ""
+
+
+# A real ESP string is rarely more than a few hundred stages; beyond this the design is
+# physically meaningless (the target rate has exceeded what this pump series can lift).
+MAX_STAGES = 400
 
 
 def _total_fluid_bpd(target_q_stb_d: float, vlp: VLPInputs) -> float:
@@ -196,10 +232,18 @@ def design_esp(
     # 3. stages from the (viscosity-corrected) pump curve at the design total-fluid rate
     q_fluid = _total_fluid_bpd(target_q_stb_d, vlp)
     ch, ce = _visc_correction(fluid_viscosity_cp)
-    h_stage = pump.head_per_stage(q_fluid, frequency_hz) * ch
-    h_stage = max(h_stage, 1e-3)
-    stages = int(np.ceil(tdh_ft / h_stage))
-    stages = max(stages, 1)
+    runout = pump.runout_bpd(frequency_hz)
+    h_stage_true = pump.head_per_stage(q_fluid, frequency_hz) * ch
+    # Feasibility: at/above runout the head per stage collapses to ~0 and the naive
+    # stage = ceil(TDH / h_stage) explodes to millions. Detect this and present a sane
+    # capped count + a clear infeasible flag instead of a nonsense KPI (audit: 'runaway
+    # stage count when target exceeds pump runout').
+    feasible = q_fluid < runout and h_stage_true > 1e-2
+    h_stage = max(h_stage_true, 1e-3)
+    raw_stages = int(np.ceil(tdh_ft / h_stage)) if tdh_ft > 0 else 1
+    raw_stages = max(raw_stages, 1)
+    stages_capped = (not feasible) or raw_stages > MAX_STAGES
+    stages = min(raw_stages, MAX_STAGES)
 
     # 4. power: brake hp from the standard field formula, motor-de-rated
     eff = max(pump.efficiency(q_fluid, frequency_hz) * ce, 0.05)
@@ -214,13 +258,23 @@ def design_esp(
 
     # operating point with boost: solve pwf_ipr(q) == pwf_vlp(q) - boost
     op = _operating_point_with_boost(ipr, vlp, boost_psi)
-    meets = op.q_op >= 0.98 * target_q_stb_d and op.converged
+    meets = bool(op.q_op >= 0.98 * target_q_stb_d and op.converged and feasible)
 
-    note = (
-        f"Pump curve: illustrative 60-Hz centrifugal (BEP {pump.q_bep_bpd:.0f} bpd, "
-        f"{pump.head_per_stage(pump.q_bep_bpd):.1f} ft/stage at BEP). "
-        f"Viscosity de-rate: head x{ch:.2f}, eff x{ce:.2f} at {fluid_viscosity_cp:.0f} cP."
-    )
+    if not feasible:
+        note = (
+            f"Target total fluid {q_fluid:,.0f} bpd exceeds this pump's runout "
+            f"({runout:,.0f} bpd at {frequency_hz:.0f} Hz): head per stage collapses to "
+            f"~0 and the stage count is unbounded. Select a larger pump series or raise "
+            f"the drive frequency. Stage count shown is capped at {MAX_STAGES}."
+        )
+    else:
+        note = (
+            f"Pump curve: illustrative 60-Hz centrifugal (BEP {pump.q_bep_bpd:.0f} bpd, "
+            f"{pump.head_per_stage(pump.q_bep_bpd):.1f} ft/stage at BEP; runout "
+            f"{runout:,.0f} bpd at {frequency_hz:.0f} Hz). "
+            f"Viscosity de-rate: head x{ch:.2f}, eff x{ce:.2f} at "
+            f"{fluid_viscosity_cp:.0f} cP."
+        )
     return ESPDesign(
         target_q_stb_d=target_q_stb_d,
         total_fluid_bpd=q_fluid,
@@ -231,9 +285,15 @@ def design_esp(
         frequency_hz=float(frequency_hz),
         bhp=bhp,
         efficiency=float(eff),
-        meets_target=bool(meets),
+        meets_target=meets,
         op_q_stb_d=float(op.q_op),
         op_pwf_psia=float(op.pwf_op),
+        head_visc_factor=float(ch),
+        eff_visc_factor=float(ce),
+        runout_bpd=float(runout),
+        feasible=bool(feasible),
+        stages_capped=bool(stages_capped),
+        meets_target_tol=0.98,
         notes=note,
     )
 
@@ -269,8 +329,13 @@ class GasLiftResult:
     """Gas-lift injection sweep + the optimum."""
 
     points: list  # list[GasLiftPoint]
-    best: GasLiftPoint
-    inj_rate_mscf_d_at_best: float  # injection gas rate at optimum, Mscf/d
+    best: GasLiftPoint  # technical optimum: argmax(q_op) over the sweep
+    inj_rate_mscf_d_at_best: float  # injection gas rate at technical optimum, Mscf/d
+    # ---- honesty / economics fields (added for the workbench view) ----
+    rollover: bool = False          # True if an interior production max exists in-range
+    econ: GasLiftPoint | None = None  # economic optimum (max net $) if prices supplied
+    econ_net_usd_d: float = 0.0     # net $/d at the economic optimum
+    inj_rate_mscf_d_at_econ: float = 0.0  # injection gas rate at the economic optimum
 
 
 def gas_lift_sweep(
@@ -278,6 +343,9 @@ def gas_lift_sweep(
     vlp: VLPInputs,
     inj_glr_max_scf_stb: float = 1200.0,
     n: int = 16,
+    oil_price: float | None = None,
+    gas_cost: float | None = None,
+    nri: float = 1.0,
 ) -> GasLiftResult:
     """Sweep gas-lift injection GLR and find the operating point at each level.
 
@@ -286,6 +354,18 @@ def gas_lift_sweep(
     friction and the column starts to load with gas, so production plateaus or declines —
     the classic gas-lift performance curve. Returns the sweep and the optimum injection
     GLR. Injection gas rate (Mscf/d) at the optimum = inj_GLR × oil-equivalent liquid.
+
+    ``best`` is the *technical* optimum (max rate). ``rollover`` is True only when that
+    maximum is interior to the swept range (a genuine rate rollover); when the maximum is
+    at the last swept point the rate is still climbing and ``best`` is a sweep-boundary
+    artifact, not a physical optimum (audit fix). If ``oil_price`` and ``gas_cost`` are
+    supplied the *economic* optimum is also returned as ``econ`` — the injection rate that
+    maximizes net daily revenue (incremental oil revenue − gas cost), where the
+    diminishing-returns knee, not the rate peak, is the real operating choice.
+
+    The signature is backward compatible: ``oil_price``/``gas_cost``/``nri`` default such
+    that economics are skipped (existing callers and numeric-invariant tests are
+    unaffected).
     """
     inj_glrs = np.linspace(0.0, float(inj_glr_max_scf_stb), int(n))
     formation_glr = float(vlp.glr_scf_stb)
@@ -301,6 +381,33 @@ def gas_lift_sweep(
                 pwf_psia=float(op.pwf_op),
             )
         )
-    best = max(points, key=lambda p: p.q_op_stb_d)
+    best_idx = int(np.argmax([p.q_op_stb_d for p in points]))
+    best = points[best_idx]
+    # an interior maximum (not the first or last swept point) is a real rollover
+    rollover = 0 < best_idx < len(points) - 1
     inj_rate = best.inj_glr_scf_stb * best.q_op_stb_d / 1000.0  # Mscf/d
-    return GasLiftResult(points=points, best=best, inj_rate_mscf_d_at_best=float(inj_rate))
+
+    econ: GasLiftPoint | None = None
+    econ_net = 0.0
+    econ_inj_rate = 0.0
+    if oil_price is not None and gas_cost is not None and points:
+        # economic optimum: maximize net $/d = incremental oil revenue - lift-gas cost,
+        # measured against the no-injection (inj=0) base rate. Oil split is liquid * (1-wc).
+        base = points[0]
+        oil_frac = 1.0 - float(np.clip(vlp.water_cut, 0.0, 0.999))
+        best_net = -1e30
+        for p in points:
+            d_oil = (p.q_op_stb_d - base.q_op_stb_d) * oil_frac  # incremental oil, STB/d
+            inj_mscf_d = p.inj_glr_scf_stb * p.q_op_stb_d / 1000.0
+            net = d_oil * float(oil_price) * float(nri) - inj_mscf_d * float(gas_cost)
+            if net > best_net:
+                best_net = net
+                econ = p
+                econ_inj_rate = inj_mscf_d
+        econ_net = float(best_net)
+
+    return GasLiftResult(
+        points=points, best=best, inj_rate_mscf_d_at_best=float(inj_rate),
+        rollover=bool(rollover), econ=econ, econ_net_usd_d=float(econ_net),
+        inj_rate_mscf_d_at_econ=float(econ_inj_rate),
+    )

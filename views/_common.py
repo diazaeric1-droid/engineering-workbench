@@ -21,11 +21,42 @@ def ensure_state() -> None:
     ss.setdefault("oil_price", 70.0)
     ss.setdefault("nri", 0.80)
     ss.setdefault("discount", 0.10)
-    ss.setdefault("data_source", "real")
+    ss.setdefault("gas_cost", 1.50)            # shared so Gas-Lift + Case File agree
+    ss.setdefault("data_source", "synthetic")  # synthetic demo fleet is the default
     ss.setdefault("anthropic_key", "")
     if not ss.get("well_id"):
-        choices = core.well_choices()
-        ss["well_id"] = choices[0] if choices else ""
+        synth = synthetic_well_ids()
+        ss["well_id"] = ("well_013" if "well_013" in synth
+                         else (synth[0] if synth else
+                               (core.well_choices() or [""])[0]))
+
+
+# ---- cheap, cached well-id lists (no full-fleet CSV parse) ------------------------
+# app.py's sidebar selectbox runs on EVERY rerun; building its options from
+# core.well_choices() reparsed all 100+ SCADA/injection CSVs each time. These glob-
+# only, cached helpers replace that per-interaction tax (perf #0) and scope the well
+# universe to the selected data source (#3).
+
+@st.cache_data(show_spinner=False)
+def synthetic_well_ids() -> list[str]:
+    """Ordered synthetic well_0NN ids (union of production / SCADA / injection), by
+    cheap directory globs — no DataFrame parse."""
+    pec = {p.stem for p in core.PEC_SYNTH_DIR.glob("well_*.json")}
+    esp = {p.stem for p in core.ESP_DATA.glob("well_*.csv")}
+    gla = {p.stem for p in core.GLA_FLEET_DIR.glob("well_*.csv")}
+    return sorted(pec | esp | gla)
+
+
+@st.cache_data(show_spinner=False)
+def colorado_well_ids() -> list[str]:
+    """Ordered real Colorado ECMC selection keys (state API ids), cached."""
+    return sorted(core.colorado_wells())
+
+
+def well_choices_for(source: str) -> list[str]:
+    """Selection keys scoped to the active data source: synthetic well_0NN fleet
+    (default) or the real Colorado ECMC ids."""
+    return colorado_well_ids() if source == "real" else synthetic_well_ids()
 
 
 def deck() -> tuple[float, float, float]:
@@ -33,8 +64,22 @@ def deck() -> tuple[float, float, float]:
     return float(ss["oil_price"]), float(ss["nri"]), float(ss["discount"])
 
 
+def gas_cost() -> float:
+    """Gas cost ($/Mcf) — shared by Gas-Lift Optimum, Injection Allocation, Case File."""
+    return float(st.session_state.get("gas_cost", 1.50))
+
+
 def current_well() -> str:
     return str(st.session_state.get("well_id", ""))
+
+
+@st.cache_data(show_spinner=False)
+def design_seed_cached(well_id: str):
+    """Per-well Design-section seed (reservoir/fluid/completion + provenance), cached
+    on the well id. The Nodal / Lift / PVT pages pre-fill their inputs from this so the
+    forward-design what-if is anchored to the selected well instead of generic
+    constants (audit: nodal/lift 'ignore the selected well')."""
+    return core.well_design_seed(well_id)
 
 
 def well_identity(well_id: str) -> dict:
@@ -57,8 +102,13 @@ def well_identity(well_id: str) -> dict:
 
 
 def context() -> None:
-    """The standard global context bar under every masthead."""
+    """The standard global context bar under every masthead.
+
+    The Deck cell carries the gas cost too, so the Gas-Lift / Injection-Allocation
+    pages — whose economics depend on it — never contradict the global context
+    (audit: 'context bar omits gas cost')."""
     oil, nri, disc = deck()
+    gc = gas_cost()
     wid = current_well()
     ident = well_identity(wid) if wid else {"name": "—", "basin_formation": "—",
                                             "lift": "—", "source": "—"}
@@ -66,17 +116,27 @@ def context() -> None:
         ("Well", f"{wid} · {ident['name']}" if wid else "—"),
         ("Formation", ident["basin_formation"]),
         ("Lift", ident["lift"]),
-        ("Deck", f"${oil:,.0f}/bbl · {nri:.0%} NRI · {disc:.0%} disc."),
+        ("Deck", f"${oil:,.0f}/bbl oil · ${gc:,.2f}/Mcf gas · {nri:.0%} NRI · "
+                 f"{disc:.0%} disc."),
         ("Data", ident["source"]),
     ])
 
 
 # ---- cached heavy loads ----------------------------------------------------------
+# Convention (audit: 'heavy frames cached with cache_resource'):
+#   * cache_DATA for pandas frames / Series / dicts-of-frames — Streamlit returns a
+#     COPY each call, so a view that mutates the result can never corrupt the shared
+#     singleton the next page reads.
+#   * cache_RESOURCE only for unpicklable, intentionally-shared objects (the joblib
+#     classifier, the fitted hazard model).
 
-@st.cache_resource(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def esp_scores_cached():
-    """(probs desc Series, Tree-SHAP contribs DataFrame) for the synthetic ESP fleet."""
-    return core.esp_scores()
+    """(probs desc Series, Tree-SHAP contribs DataFrame) for the synthetic ESP fleet.
+
+    Reuses the cached model + features instead of re-loading the joblib and
+    re-featurizing the 100-well fleet inside core.esp_scores() (perf #0)."""
+    return core.esp_scores(model=esp_model_cached(), features=esp_features_cached())
 
 
 @st.cache_resource(show_spinner=False)
@@ -84,12 +144,12 @@ def esp_model_cached():
     return core.esp_model.ESPRiskModel.load(core.ESP_MODEL)
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def esp_fleet_cached():
     return core.esp_fleet()
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def esp_features_cached():
     return core.esp_features.featurize_fleet(esp_fleet_cached())
 
@@ -131,14 +191,20 @@ def oracle_cached() -> dict | None:
         return None
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def gla_fleet_cached():
     return core.gla_fleet()
 
 
 @st.cache_data(show_spinner=False)
 def well_index_cached():
-    return core.well_index()
+    # Reuse the cached ESP scores rather than letting well_index recompute them
+    # (the third full featurize + joblib load on a cold Well Browser open). (perf #0)
+    try:
+        probs, _ = esp_scores_cached()
+    except Exception:  # noqa: BLE001 — model not available yet
+        probs = None
+    return core.well_index(probs=probs)
 
 
 @st.cache_data(show_spinner=False)

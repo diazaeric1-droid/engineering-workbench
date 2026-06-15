@@ -173,3 +173,173 @@ def test_blind_holdout_note_reads_committed_artifact():
     note = core.blind_holdout_note()
     assert "0.722" in note
     assert "18" in note
+
+
+# ---------------------------------------------------------------- v0.2.0 additions
+def test_gla_ground_truth_loads_with_expected_columns():
+    """The Gas-Lift Optimum fit-vs-truth panel needs the committed ground-truth."""
+    gt = core.gla_ground_truth()
+    assert not gt.empty
+    assert "well_013" in gt.index
+    for col in ("q_sl", "q_max", "a", "water_cut", "true_opt_inj"):
+        assert col in gt.columns
+
+
+def test_esp_scores_accepts_and_reuses_model_and_features():
+    """esp_scores must produce identical results whether it loads the model/features
+    itself or is handed the cached ones (the perf reuse the view layer depends on)."""
+    fleet = core.esp_fleet()
+    features = core.esp_features.featurize_fleet(fleet)
+    model = core.esp_model.ESPRiskModel.load(core.ESP_MODEL)
+    probs_passed, _ = core.esp_scores(model=model, features=features)
+    probs_self, _ = core.esp_scores()
+    assert list(probs_passed.index) == list(probs_self.index)
+    assert np.allclose(probs_passed.values, probs_self.values)
+
+
+def test_well_index_accepts_precomputed_probs():
+    """well_index(probs=...) must merge the passed risk Series (cache-reuse path)."""
+    probs, _ = core.esp_scores()
+    idx = core.well_index(probs=probs).set_index("well_id")
+    # a scorable synthetic well carries the risk we passed in
+    assert idx.loc["well_013", "esp_risk_30d"] == pytest.approx(float(probs["well_013"]))
+
+
+# ---------------------------------------------------------------- design seed (v0.3.0)
+def test_design_seed_anchors_to_well_with_honest_provenance():
+    """The Design-section seed must be (a) finite + physically sane, (b) WELL-SPECIFIC
+    (two different wells seed different reservoir/rate/fluid numbers), and (c) honestly
+    provenanced — water cut is MEASURED for a production well, reservoir pressure is
+    ASSUMED. This is what makes Nodal/Lift forward-design anchored to the selection."""
+    a = core.well_design_seed("well_013")
+    b = core.well_design_seed("well_017")
+    for s in (a, b):
+        assert s.reservoir_pressure_psia > 0 and np.isfinite(s.reservoir_pressure_psia)
+        assert 0.0 <= s.water_cut_frac < 1.0
+        assert s.test_rate_stb_d > 0
+        # bubble point can never exceed reservoir pressure (regime guard)
+        assert s.bubble_point_psia <= s.reservoir_pressure_psia + 1e-6
+        assert s.glr_scf_stb > 0 and s.oil_api > 0 and s.depth_ft > 0
+    # well-specific: the two wells do not collapse to identical generic constants
+    assert (a.test_rate_stb_d, a.water_cut_frac) != (b.test_rate_stb_d, b.water_cut_frac)
+    # provenance is honest about what came from the well vs an assumption
+    assert a.provenance["water_cut_frac"] == "measured"
+    assert a.provenance["reservoir_pressure_psia"] == "assumed"
+    assert a.provenance["bubble_point_psia"] == "derived"
+
+
+def test_design_seed_real_and_scada_only_wells_do_not_crash():
+    """A real Colorado well (production only) and a SCADA-only synthetic well (no
+    production file) must both yield a usable seed — the Design pages never dead-end."""
+    real_id = sorted(core.colorado_wells())[0]
+    rs = core.well_design_seed(real_id)
+    assert rs.source == "real" and rs.reservoir_pressure_psia > 0
+    ss = core.well_design_seed("well_085")  # SCADA-only, no production JSON
+    assert ss.reservoir_pressure_psia > 0 and ss.test_rate_stb_d > 0
+
+
+def test_design_seed_never_fabricates_measured_provenance_on_shut_in_tail():
+    """Regression: real wells often end in a zero-rate shut-in month. The seed must take
+    fluids from the last PRODUCING month, never label an assumed default 'measured'."""
+    for wid in sorted(core.colorado_wells()):
+        s = core.well_design_seed(wid)
+        if s.provenance["water_cut_frac"] == "measured":
+            # measured => it came from a real producing record, so current oil is positive
+            assert s.current_oil_bopd > 0.0, f"{wid}: 'measured' water cut off a zero record"
+        else:
+            # otherwise it must be honestly flagged assumed (no production at all)
+            assert s.provenance["water_cut_frac"] == "assumed"
+
+
+# ---------------------------------------------------------------- lift physics (v0.3.0)
+def test_lift_design_feasible_flag_and_runout_scaling():
+    """ESP design must (a) expose viscosity factors + a frequency-scaled runout, and
+    (b) flag an infeasible target (rate beyond pump runout) with a capped stage count
+    instead of a runaway thousands-of-stages number (audit)."""
+    pm = core.wps_lift.PumpModel()
+    # affinity law: runout scales linearly with frequency
+    assert pm.runout_bpd(60.0) == pytest.approx(pm.q_runout_bpd, rel=1e-6)
+    assert pm.runout_bpd(50.0) == pytest.approx(pm.q_runout_bpd * 50.0 / 60.0, rel=1e-6)
+    ipr = core.wps_nodal.vogel_ipr(p_res=3000.0, pb=3000.0, q_test=600.0, pwf_test=2200.0)
+    vlp = core.wps_nodal.VLPInputs(water_cut=0.4, glr_scf_stb=300.0)
+    # a target far beyond pump runout must be flagged infeasible + capped, not runaway
+    huge = core.wps_lift.design_esp(ipr, vlp, target_q_stb_d=9000.0, frequency_hz=60.0)
+    assert huge.feasible is False
+    assert huge.stages_capped is True
+    assert huge.stages <= 1000  # capped, not a nonsense five-figure count
+    # a sane target is feasible and carries the viscosity de-rate factors
+    ok = core.wps_lift.design_esp(ipr, vlp, target_q_stb_d=900.0, frequency_hz=60.0,
+                                  fluid_viscosity_cp=50.0)
+    assert 0.0 < ok.head_visc_factor <= 1.0 and 0.0 < ok.eff_visc_factor <= 1.0
+
+
+def test_gas_lift_sweep_economics_and_rollover_flags():
+    """gas_lift_sweep stays backward compatible (no prices -> no econ optimum) and,
+    when prices are supplied, returns an economic optimum + an honest rollover flag."""
+    ipr = core.wps_nodal.vogel_ipr(p_res=3000.0, pb=3000.0, q_test=600.0, pwf_test=2200.0)
+    vlp = core.wps_nodal.VLPInputs(water_cut=0.4, glr_scf_stb=300.0)
+    base = core.wps_lift.gas_lift_sweep(ipr, vlp, n=10)
+    assert base.econ is None and isinstance(base.rollover, bool)
+    econ = core.wps_lift.gas_lift_sweep(ipr, vlp, n=10, oil_price=70.0,
+                                        gas_cost=1.5, nri=0.8)
+    assert econ.econ is not None
+    assert 0.0 <= econ.econ.inj_glr_scf_stb <= base.points[-1].inj_glr_scf_stb + 1e-6
+
+
+# ---------------------------------------------------------------- probabilistic econ (#2)
+def test_simulate_intervention_ordered_deterministic_with_tornado():
+    """The probabilistic-economics engine behind the AI Review / Case File MC panels:
+    P90<=P50<=P10, payout probability in [0,1], a tornado with a positive swing per input,
+    npv_samples for the histogram, and bit-for-bit determinism on a fixed seed."""
+    d = core.pec_assumptions.intervention_defaults("acid_stimulation")
+    kw = dict(name="acid_stimulation", treatment_cost_usd=d["cost_usd"],
+              incremental_rate_bopd=d["uplift_bopd"], uplift_decline_per_yr=d["uplift_decline"],
+              realized_price_per_bbl=70.0, discount_rate=0.10, opex_per_bbl=12.0, seed=42)
+    s1 = core.pec_economics.simulate_intervention(**kw)
+    s2 = core.pec_economics.simulate_intervention(**kw)
+    assert s1["npv_p90_usd"] <= s1["npv_p50_usd"] <= s1["npv_p10_usd"]
+    assert 0.0 <= s1["probability_of_payout"] <= 1.0
+    assert len(s1["npv_samples"]) == s1["n_trials"] == 10_000
+    assert set(s1["tornado"]) == {"incremental_rate_bopd", "uplift_decline_per_yr",
+                                  "realized_price_per_bbl"}
+    assert all(t["swing"] >= 0 for t in s1["tornado"].values())
+    assert s1["npv_p50_usd"] == s2["npv_p50_usd"]  # deterministic on the seed
+
+
+# ---------------------------------------------------------------- survival metrics pin
+def test_survival_metrics_beat_km_baseline():
+    """Run-Life headline numbers: out-of-fold C-index orders better than chance and the
+    IBS beats the covariate-free Kaplan-Meier baseline (the page's central claim)."""
+    res = core.esp_survival_model.evaluate_from_disk(
+        str(core.ESP_DATA), str(core.ESP_DATA / "labels.csv")).as_dict()
+    assert 0.5 < res["c_index"] <= 1.0
+    assert res["ibs"] < res["ibs_km_baseline"]
+
+
+# ---------------------------------------------------------------- committed artifacts
+def test_committed_artifacts_present_so_cold_start_is_fast():
+    """The deterministic artifacts are COMMITTED, so a fresh checkout needs no first-run
+    training and CI need not bootstrap twice. If this fails, cold start regressed."""
+    assert core.ESP_MODEL.exists() and core.ESP_TRAINING_REPORT.exists()
+    assert any(core.ESP_DATA.glob("well_*.csv"))
+    assert core.GLA_FLEET_DIR.exists() and any(core.GLA_FLEET_DIR.glob("well_*.csv"))
+    assert core.GLA_GROUND_TRUTH.exists()
+    assert any(core.PEC_SYNTH_DIR.glob("well_*.json"))
+
+
+# ---------------------------------------------------------------- PVT numeric (bluebonnet)
+def test_pvt_table_and_bubble_point_are_sane():
+    """PVT lens numerics (skipped where bluebonnet is unavailable): bubble point is a
+    positive pressure and the PVT table returns finite Bo / viscosity / z over the range."""
+    try:
+        pvt, _curves, _rta = core.wps_physics()
+    except Exception:  # noqa: BLE001 — bluebonnet absent on this runtime
+        pytest.skip("bluebonnet unavailable")
+    inp = pvt.PVTInputs(api_gravity=38.0, gas_specific_gravity=0.75,
+                        solution_gor=900.0, temperature=210.0)
+    pb = pvt.bubble_point(inp)
+    assert 100.0 < pb < 10000.0
+    df = pvt.pvt_table(inp)
+    for col in ("Bo", "oil_viscosity", "Bg", "gas_viscosity", "z_factor"):
+        assert col in df.columns and np.all(np.isfinite(df[col].values))
+    assert (df["z_factor"] > 0).all()

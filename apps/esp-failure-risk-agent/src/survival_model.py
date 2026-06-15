@@ -135,7 +135,9 @@ class DiscreteTimeHazardModel:
         # Kaplan–Meier baseline) even though it helps ranking. Instead we keep the true
         # low daily base rate and lean on strong L2 (small C) — on this small, noisy
         # benchmark (17 events / 100 wells over 90 days) that improves BOTH the OOF
-        # C-index and the IBS (beats KM by ~16%). See evaluate_oof / README.
+        # C-index and the IBS. The exact IBS gain over the KM baseline is computed and
+        # printed at runtime ((1 - IBS/IBS_KM)*100; ~+13% on the committed fleet) — do
+        # not hardcode a stale figure here. See evaluate_oof / README.
         with _quiet_solver():
             self.clf = LogisticRegression(
                 max_iter=5000, C=0.02, class_weight=None, random_state=42

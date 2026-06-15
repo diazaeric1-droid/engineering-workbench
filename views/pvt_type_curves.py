@@ -4,6 +4,13 @@ curves, and rate-transient analysis.
 bluebonnet is imported LAZILY inside this view (via core.wps_physics) so the rest
 of the workbench keeps working when the physics engine is unavailable — this page
 then renders an empty state instead of crashing the product.
+
+The PVT tab is anchored to the SELECTED well: its fluid inputs (oil API, gas SG,
+solution GOR/Rs, reservoir temperature) are seeded from ``_common.design_seed_cached``
+so the black-oil model describes the chosen well's fluid, not generic constants. The
+physics-curve and RTA tabs are forward / uploaded-series tools — they are intentionally
+independent of the selected well, and their captions say so to avoid implying the
+curve is that well's history.
 """
 from __future__ import annotations
 
@@ -36,6 +43,15 @@ def _bubble_point(inp) -> float:
     return pvt.bubble_point(inp)
 
 
+@st.cache_data(show_spinner=False, hash_funcs={"wps.pvt.PVTInputs": _hash_inputs})
+def _props_at_pressure(inp, pressure: float) -> dict:
+    """Single-pressure PVT properties (e.g. Bo at the bubble point). Cached so the
+    headline 'Bo @ Pb' KPI never triggers an extra uncached fluid build on rerun —
+    matching the caching discipline of _pvt_table / _bubble_point."""
+    pvt, _curves, _rta = core.wps_physics()
+    return pvt.props_at_pressure(inp, float(pressure))
+
+
 @st.cache_data(show_spinner=False, hash_funcs={"wps.curves.CurveInputs": _hash_inputs})
 def _production_curve(inp):
     _pvt, curves, _rta = core.wps_physics()
@@ -50,6 +66,28 @@ def _hash_series(df: pd.DataFrame) -> bytes:
 def _fit_rta(series: pd.DataFrame, horizon_years: float = 15.0):
     _pvt, _curves, rta = core.wps_physics()
     return rta.fit_rta(series, horizon_years=horizon_years)
+
+
+@st.cache_data(show_spinner=False)
+def _synthetic_series():
+    """The built-in RTA demo series — a ~6 s bluebonnet reservoir solve. It is
+    deterministic (fixed seed), so cache it: otherwise every rerun (any slider drag
+    or global sidebar change) re-ran the full solve on the RTA tab (perf #0). Combined
+    with the cached _fit_rta, the default RTA path solves once then is near-instant."""
+    _pvt, _curves, rta = core.wps_physics()
+    return rta.synthetic_series()
+
+
+# Slider bounds, declared once so the per-well seed can be clamped into range before it
+# is written to session_state (a seed outside the slider's [min,max] raises in Streamlit).
+_API_MIN, _API_MAX = 15.0, 55.0
+_SG_MIN, _SG_MAX = 0.55, 1.10
+_GOR_MIN, _GOR_MAX = 100.0, 3000.0
+_TEMP_MIN, _TEMP_MAX = 120.0, 320.0
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return float(min(max(float(v), lo), hi))
 
 
 def render() -> None:
@@ -69,10 +107,8 @@ def render() -> None:
             "pip install bluebonnet (Python <= 3.11) to enable this page.")
         return
 
-    theme.data_badge(
-        "synthetic",
-        "Physics-modeled (bluebonnet) on illustrative reservoir/fluid inputs; the RTA "
-        "tab can ingest a real rate series.")
+    wid = _common.current_well()
+    seed = _common.design_seed_cached(wid)
 
     tab_pvt, tab_curve, tab_rta = st.tabs(
         ["PVT Properties", "Physics Production Curve", "Rate-Transient Analysis"])
@@ -80,18 +116,58 @@ def render() -> None:
     # ------------------------------------------------------------------ PVT
     with tab_pvt:
         pvt_mod, _curves_mod, rta_mod = core.wps_physics()
+        # This tab IS the selected well's fluid — provenance reflects the chosen well.
+        theme.data_badge(
+            "real" if seed.source == "real" else "synthetic",
+            f"Black-oil PVT (bluebonnet) seeded from {seed.well_id} · {seed.name} "
+            f"({seed.formation}). Edit any input to run a what-if.")
+
         pt.section("Fluid Properties Vs. Pressure",
-                   "Standing / Vázquez-Beggs / Dranchuk–Abou-Kassem correlations.")
+                   "Standing oil FVF/Rs/viscosity; Dranchuk–Abou-Kassem gas z-factor "
+                   "with Sutton pseudo-criticals; McCain water properties.")
+
+        # --- seed the four fluid inputs from the selected well's design seed ---------
+        # Set the key-backed value BEFORE the widget instantiates, gated on a per-well
+        # sentinel, so changing the well re-seeds without the "cannot set a widget value
+        # after instantiation" error. After seeding the user can edit freely.
+        api_seed = _clamp(seed.oil_api, _API_MIN, _API_MAX)
+        sg_seed = _clamp(seed.gas_sg, _SG_MIN, _SG_MAX)
+        gor_seed = _clamp(seed.gor_scf_stb, _GOR_MIN, _GOR_MAX)
+        temp_seed = _clamp(seed.temp_bottom_f, _TEMP_MIN, _TEMP_MAX)
+        if st.session_state.get("pvt_seeded_well") != wid:
+            st.session_state["pvt_api"] = api_seed
+            st.session_state["pvt_sg"] = sg_seed
+            st.session_state["pvt_gor"] = gor_seed
+            st.session_state["pvt_temp"] = temp_seed
+            st.session_state["pvt_seeded_well"] = wid
+
+        prov = seed.provenance
+        st.caption(
+            f"Inputs seeded from **{seed.well_id} · {seed.name}** "
+            f"({'real — Colorado ECMC' if seed.source == 'real' else 'synthetic fleet'}): "
+            f"oil API {api_seed:.0f}° ({prov.get('oil_api', 'assumed')}), "
+            f"gas SG {sg_seed:.2f} ({prov.get('gas_sg', 'assumed')}), "
+            f"Rs {gor_seed:,.0f} scf/STB ({prov.get('gor_scf_stb', 'derived')}), "
+            f"BHT {temp_seed:.0f}°F ({prov.get('temp_bottom_f', 'derived')}). "
+            "Editable — measured > derived > assumed; see the well's Case File for the "
+            "full provenance map.")
+
         c1, c2, c3 = st.columns(3)
         with c1:
-            api = st.slider("Oil Gravity (°API)", 15.0, 55.0, 38.0, 0.5)
-            sg = st.slider("Gas Specific Gravity (air=1)", 0.55, 1.10, 0.75, 0.01)
+            api = st.slider("Oil Gravity (°API)", _API_MIN, _API_MAX, step=0.5,
+                            key="pvt_api")
+            sg = st.slider("Gas Specific Gravity (air=1)", _SG_MIN, _SG_MAX, step=0.01,
+                           key="pvt_sg")
         with c2:
-            gor = st.slider("Solution GOR, Rs (scf/bbl)", 100.0, 3000.0, 900.0, 50.0)
-            temp = st.slider("Reservoir Temperature (°F)", 120.0, 320.0, 210.0, 5.0)
+            gor = st.slider("Solution GOR, Rs (scf/STB)", _GOR_MIN, _GOR_MAX, step=50.0,
+                            key="pvt_gor")
+            temp = st.slider("Reservoir Temperature (°F)", _TEMP_MIN, _TEMP_MAX,
+                             step=5.0, key="pvt_temp")
         with c3:
-            p_lo, p_hi = st.slider("Pressure Range (psia)", 200, 10000, (500, 6000), 100)
-            dryness = st.selectbox("Gas Dryness", ("wet gas", "dry gas"), index=0)
+            p_lo, p_hi = st.slider("Pressure Range (psia)", 200, 10000, (500, 6000), 100,
+                                   key="pvt_prange")
+            dryness = st.selectbox("Gas Dryness", ("wet gas", "dry gas"), index=0,
+                                   key="pvt_dry")
 
         pvt_in = pvt_mod.PVTInputs(
             api_gravity=api, gas_specific_gravity=sg, solution_gor=gor,
@@ -100,46 +176,108 @@ def render() -> None:
         df = _pvt_table(pvt_in)
         pb = _bubble_point(pvt_in)
 
+        # Bo at the bubble point (Bob) is the canonical reservoir-engineering reference;
+        # above Pb the undersaturated oil compresses and Bo DECLINES, so the last-row
+        # value at Pmax is neither the max nor the standard reference. Report both,
+        # each labelled with the pressure it is quoted at.
+        bob = float(_props_at_pressure(pvt_in, pb)["Bo"])
+        bo_pmax = float(df["Bo"].iloc[-1])
+        rs_bob = gor  # at/above Pb the oil is saturated at the initial solution Rs
         pt.kpi_row([
-            {"label": "Bubble Point", "value": f"{pb:,.0f} psia"},
-            {"label": "Bo @ Pmax", "value": f"{df['Bo'].iloc[-1]:.3f} rb/stb"},
-            {"label": "Oil Viscosity @ Pmin", "value": f"{df['oil_viscosity'].iloc[0]:.3f} cP"},
+            {"label": "Bubble Point (Pb)", "value": f"{pb:,.0f} psia",
+             "help": "Standing correlation at the seeded Rs / API / SG / temperature."},
+            {"label": "Bo @ Pb (Bob)", "value": f"{bob:.3f} rb/stb",
+             "help": f"Oil FVF at the bubble point ({pb:,.0f} psia) — the conventional "
+                     f"reference Bo, at the initial solution Rs of {rs_bob:,.0f} scf/STB."},
+            {"label": f"Bo @ Pmax ({p_hi:,} psia)", "value": f"{bo_pmax:.3f} rb/stb",
+             "help": "Undersaturated oil FVF at the top of the chosen pressure range — "
+                     "lower than Bob because the oil compresses above the bubble point."},
+            {"label": "Oil μ @ Pmin", "value": f"{df['oil_viscosity'].iloc[0]:.3f} cP",
+             "help": f"Live-oil viscosity (Standing) at {p_lo:,} psia."},
         ])
 
         cL, cR = st.columns(2)
         with cL:
             fig = go.Figure()
-            fig.add_scatter(x=df["pressure"], y=df["Bo"], name="Bo (oil FVF, rb/stb)")
-            fig.add_scatter(x=df["pressure"], y=df["Bw"], name="Bw (water FVF, rb/stb)")
+            fig.add_scatter(x=df["pressure"], y=df["Bo"], name="Bo (oil FVF, rb/stb)",
+                            line=dict(color=theme.BLUE))
+            fig.add_scatter(x=df["pressure"], y=df["Bw"], name="Bw (water FVF, rb/stb)",
+                            line=dict(color=theme.TEAL))
             if p_lo <= pb <= p_hi:
                 fig.add_vline(x=pb, line_dash="dot", line_color=theme.AMBER)
+                # annotate the bubble-point peak so the Bo rollover reads clearly
+                fig.add_scatter(x=[pb], y=[bob], mode="markers+text",
+                                marker=dict(color=theme.AMBER, size=9, symbol="diamond"),
+                                text=[f"Bob {bob:.3f} @ Pb"], textposition="top center",
+                                name="Bob (at bubble point)")
             fig.update_layout(title="Formation Volume Factors",
                               xaxis_title="Pressure (psia)", yaxis_title="FVF (rb/stb)")
             st.plotly_chart(theme.style_fig(fig, height=300), width="stretch")
         with cR:
             figv = go.Figure()
-            figv.add_scatter(x=df["pressure"], y=df["oil_viscosity"], name="μ_oil (cP)")
-            figv.add_scatter(x=df["pressure"], y=df["water_viscosity"], name="μ_water (cP)")
+            figv.add_scatter(x=df["pressure"], y=df["oil_viscosity"], name="μ_oil (cP)",
+                             line=dict(color=theme.BLUE))
+            figv.add_scatter(x=df["pressure"], y=df["water_viscosity"],
+                             name="μ_water (cP)", line=dict(color=theme.TEAL))
             figv.update_layout(title="Oil & Water Viscosity",
                                xaxis_title="Pressure (psia)", yaxis_title="Viscosity (cP)")
             st.plotly_chart(theme.style_fig(figv, height=300), width="stretch")
 
-        figz = go.Figure()
-        figz.add_scatter(x=df["pressure"], y=df["z_factor"], name="z-factor")
-        figz.update_layout(title="Gas Z-Factor (Dranchuk–Abou-Kassem)",
-                           xaxis_title="Pressure (psia)", yaxis_title="z (-)")
-        st.plotly_chart(theme.style_fig(figz, height=260), width="stretch")
+        # --- gas PVT: Bg (gas FVF) and gas viscosity were computed but never shown ---
+        cZ, cG = st.columns(2)
+        with cZ:
+            figz = go.Figure()
+            figz.add_scatter(x=df["pressure"], y=df["z_factor"], name="z-factor",
+                             line=dict(color=theme.PURPLE))
+            figz.update_layout(title="Gas Z-Factor (Dranchuk–Abou-Kassem)",
+                               xaxis_title="Pressure (psia)", yaxis_title="z (-)")
+            st.plotly_chart(theme.style_fig(figz, height=280), width="stretch")
+        with cG:
+            # Bg (gas FVF, rcf/scf) and gas viscosity (cP) on twin axes — both are in
+            # the PVT table the engine returns and a PE expects to see them on a
+            # black-oil/gas lens.
+            figg = go.Figure()
+            figg.add_scatter(x=df["pressure"], y=df["Bg"], name="Bg (gas FVF, rcf/scf)",
+                             line=dict(color=theme.GREEN), yaxis="y1")
+            figg.add_scatter(x=df["pressure"], y=df["gas_viscosity"],
+                             name="μ_gas (cP)", line=dict(color=theme.AMBER, dash="dot"),
+                             yaxis="y2")
+            figg.update_layout(
+                title="Gas FVF (Bg) & Gas Viscosity",
+                xaxis_title="Pressure (psia)",
+                yaxis=dict(title="Bg (rcf/scf)"),
+                yaxis2=dict(title="μ_gas (cP)", overlaying="y", side="right",
+                            showgrid=False))
+            st.plotly_chart(theme.style_fig(figg, height=280), width="stretch")
+
+        # Downloadable PVT table — PEs export PVT into nodal/sim tools.
+        show_cols = ["pressure", "Bo", "oil_viscosity", "Bg", "gas_viscosity",
+                     "z_factor", "Bw", "water_viscosity"]
+        st.download_button(
+            "Download PVT Table (CSV)",
+            data=df[show_cols].to_csv(index=False),
+            file_name=f"pvt_{seed.well_id}.csv", mime="text/csv",
+            key="pvt_dl")
+
         theme.source_note(
-            "Black-oil & gas PVT correlations (Standing; Vázquez–Beggs; DAK z-factor) "
-            "via bluebonnet. Pressure psia; FVF rb/stb; viscosity cP; Rs scf/bbl.")
+            f"Black-oil & gas PVT for {seed.well_id} via bluebonnet: oil Bo/Rs/viscosity "
+            "by Standing; gas z-factor by Dranchuk–Abou-Kassem with Sutton "
+            "pseudo-criticals (Bg & μ_gas from the same gas model); water by McCain. "
+            "Pressure psia; FVF rb/stb (Bg rcf/scf); viscosity cP; Rs scf/STB. Inputs "
+            "seeded from the selected well, then editable.")
         theme.references(["pvt", "bluebonnet"])
 
     # ----------------------------------------------------- physics production curve
     with tab_curve:
         _pvt_mod, curves_mod, _ = core.wps_physics()
+        theme.data_badge(
+            "synthetic",
+            "Forward what-if forecast on the inputs below — a general gas-well "
+            "scaling solution, NOT a fit to the selected well's history.")
         pt.section("Scaling-Solution Forecast",
                    "1-D pseudopressure-diffusion solve scaled by movable gas in "
-                   "place (M) and time-to-BDF (τ); optional Arps overlay.")
+                   "place (M) and time-to-BDF (τ); optional Arps overlay. Independent "
+                   "of the selected well — set the inputs for the case you want.")
         c1, c2, c3 = st.columns(3)
         with c1:
             c_sg = st.slider("Gas Specific Gravity", 0.55, 1.00, 0.70, 0.01, key="c_sg")
@@ -159,6 +297,7 @@ def render() -> None:
             resource_mmscf=float(c_res), tau_years=float(c_tau), years=float(c_yrs))
         curve = _production_curve(curve_in)
         eur = float(curve["cum_mmscf"].iloc[-1])
+        recovery = (eur / float(c_res) * 100.0) if c_res else 0.0
 
         show_arps = st.checkbox("Overlay Empirical Arps Decline", value=False)
         arps = None
@@ -172,36 +311,41 @@ def render() -> None:
 
         pt.kpi_row([
             {"label": "EUR (physics)", "value": f"{eur:,.0f} MMscf",
-             "help": f"≈ {eur/1000:,.2f} Bcf over the horizon"},
+             "help": f"≈ {eur/1000:,.2f} Bcf over the {c_yrs:,.0f}-year horizon"},
+            {"label": "Recovery Factor", "value": f"{recovery:,.0f}%",
+             "help": "EUR ÷ movable gas in place (M) over the horizon."},
             {"label": "Peak Rate", "value": f"{curve['rate_mscf_d'].max():,.0f} Mscf/d"},
-            {"label": "Rate @ Horizon", "value": f"{curve['rate_mscf_d'].iloc[-1]:,.0f} Mscf/d"},
+            {"label": "Rate @ Horizon",
+             "value": f"{curve['rate_mscf_d'].iloc[-1]:,.0f} Mscf/d"},
         ])
 
         cL, cR = st.columns(2)
         with cL:
             figr = go.Figure()
             figr.add_scatter(x=curve["years"], y=curve["rate_mscf_d"],
-                             name="Physics (bluebonnet)")
+                             name="Physics (bluebonnet)", line=dict(color=theme.BLUE))
             if arps is not None:
                 figr.add_scatter(x=arps["years"], y=arps["rate_mscf_d"],
-                                 name="Arps overlay", line=dict(dash="dash"))
+                                 name="Arps overlay",
+                                 line=dict(dash="dash", color=theme.AMBER))
             figr.update_layout(title="Gas Rate Vs. Time", xaxis_title="Years",
                                yaxis_title="Rate (Mscf/d)")
             st.plotly_chart(theme.style_fig(figr, height=320), width="stretch")
         with cR:
             figc = go.Figure()
             figc.add_scatter(x=curve["years"], y=curve["cum_mmscf"],
-                             name="Physics cumulative")
+                             name="Physics cumulative", line=dict(color=theme.BLUE))
             if arps is not None:
                 figc.add_scatter(x=arps["years"], y=arps["cum_mmscf"],
-                                 name="Arps cumulative", line=dict(dash="dash"))
+                                 name="Arps cumulative",
+                                 line=dict(dash="dash", color=theme.AMBER))
             figc.update_layout(title="Cumulative Production", xaxis_title="Years",
                                yaxis_title="Cumulative (MMscf)")
             st.plotly_chart(theme.style_fig(figc, height=320), width="stretch")
         theme.source_note(
             "bluebonnet 1-D scaling-solution forecast, scaled by movable gas in place "
             "(M) and time-to-BDF (τ); optional Arps overlay (Arps 1945). Rate Mscf/d, "
-            "cumulative & EUR MMscf.")
+            "cumulative & EUR MMscf. A forward what-if, not the selected well's history.")
         theme.references(["bluebonnet", "arps"])
 
     # ------------------------------------------------------------------- RTA
@@ -209,7 +353,8 @@ def render() -> None:
         _pvt_mod, _curves_mod, rta_mod = core.wps_physics()
         pt.section("Fit The Physics Model To A Rate Series",
                    "Back out resource-in-place (M) and time-to-BDF (τ), then "
-                   "forecast EUR.")
+                   "forecast EUR. Fits the chosen series below — not automatically the "
+                   "selected well.")
         source = st.radio("Rate Series",
                           ("Built-in synthetic series", "Upload a CSV (date, rate)"),
                           horizontal=True)
@@ -228,8 +373,10 @@ def render() -> None:
                 st.info("Upload a CSV, or switch to the built-in synthetic series. "
                         "Nothing is stored server-side.")
         else:
-            series = rta_mod.synthetic_series()
+            series = _synthetic_series()
 
+        # ONE provenance badge on this tab, reflecting the chosen series only (no longer
+        # a second, page-level amber badge that contradicts a real-CSV upload).
         if is_real:
             theme.data_badge("real", "User-supplied rate series — RTA fit (bluebonnet).")
         else:
@@ -250,9 +397,9 @@ def render() -> None:
             figh = go.Figure()
             figh.add_scatter(x=res.history["years"], y=res.history["cum_mmscf"],
                              name="Observed cumulative", mode="markers",
-                             marker=dict(size=4))
+                             marker=dict(size=4, color=theme.GREY))
             figh.add_scatter(x=res.forecast["years"], y=res.forecast["cum_mmscf"],
-                             name="Physics fit + forecast")
+                             name="Physics fit + forecast", line=dict(color=theme.BLUE))
             figh.update_layout(title="RTA Cumulative Fit & Forecast",
                                xaxis_title="Years", yaxis_title="Cumulative (MMscf)")
             st.plotly_chart(theme.style_fig(figh, height=330), width="stretch")

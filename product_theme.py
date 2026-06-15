@@ -23,11 +23,11 @@ import streamlit as st
 
 import theme
 from theme import (  # re-exported so views need a single import
-    style_fig, data_badge, references, source_note, how_to, flag,
+    style_fig, data_badge, references, source_note, flag,
     NAVY, BLUE, RED, GREEN, AMBER, PURPLE, TEAL, GREY, COLORWAY, CITATIONS,
 )
 
-PRODUCT_VERSION = "0.1.0"
+PRODUCT_VERSION = "0.3.0"
 
 # The three consolidated operator products. Each entry:
 #   (key, display name, tagline, live url)
@@ -48,9 +48,11 @@ COMPONENTS_URL = "https://github.com/diazaeric1-droid"
 ENTERPRISE_CSS = """
 <style>
     /* denser console layout on top of theme.CSS */
+    /* single owner of the main-container top clearance + width (see theme.CSS note) */
     .block-container,
     [data-testid="stMainBlockContainer"],
-    [data-testid="stAppViewBlockContainer"] {padding-top: 4.2rem; max-width: 1500px;}
+    [data-testid="stAppViewBlockContainer"] {padding-top: 4.2rem; padding-bottom: 2rem;
+                                             max-width: 1500px;}
     [data-testid="stMetric"] {padding: 0.45rem 0.7rem; border-radius: 8px;}
     [data-testid="stMetricValue"] {font-size: 1.12rem;}
     [data-testid="stMetricLabel"] {font-size: 0.68rem; letter-spacing: 0.02em;
@@ -129,8 +131,7 @@ def _product(key: str):
 def setup_product(product_key: str, icon: str = "🛢️") -> None:
     """``st.set_page_config`` + inject theme.CSS and the enterprise layer.
 
-    Call ONCE, first, from app.py — views must never call this (nor
-    ``theme.setup_page``)."""
+    Call ONCE, first, from app.py — views must never call this."""
     _key, name, tagline, _url = _product(product_key)
     st.set_page_config(page_title=name, page_icon=icon, layout="wide",
                        initial_sidebar_state="expanded")

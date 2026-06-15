@@ -20,6 +20,15 @@ import theme
 from views import _common
 
 
+def _sync_rl_well() -> None:
+    """Drive the GLOBAL selection from the in-page picker (scorable wells are always
+    synthetic SCADA, so align the data source too)."""
+    pick = st.session_state.get("rl_pick")
+    if pick:
+        st.session_state["data_source"] = "synthetic"
+        st.session_state["well_id"] = pick
+
+
 def render() -> None:
     _common.ensure_state()
     pt.masthead("workbench", "Run-Life",
@@ -63,11 +72,12 @@ def render() -> None:
                "Median RUL = first day the projected survival S(t|x) crosses 50%.")
     table = core.esp_survival_model.fleet_survival_table(sm, features)
     top = table.head(12).iloc[::-1]
-    rmin, rmax = top["median_rul_days"].min(), top["median_rul_days"].max()
-    span = max(rmax - rmin, 1e-9)
-    colors = [theme.RED if (v - rmin) / span < 0.34
-              else (theme.AMBER if (v - rmin) / span < 0.67 else theme.GREEN)
-              for v in top["median_rul_days"]]
+
+    # Absolute clinical RUL tiers (NOT min/max of the shown subset — a relative scale
+    # painted a 45-day-RUL ESP green even though it is a near-term workover).
+    def _rul_color(v: float) -> str:
+        return theme.RED if v < 30 else (theme.AMBER if v < 60 else theme.GREEN)
+    colors = [_rul_color(float(v)) for v in top["median_rul_days"]]
     rfig = go.Figure(go.Bar(x=top["median_rul_days"], y=top["well_id"],
                             orientation="h", marker_color=colors,
                             hovertemplate="%{y}: median RUL %{x:.0f}d<extra></extra>"))
@@ -76,19 +86,64 @@ def render() -> None:
     st.plotly_chart(theme.style_fig(rfig, height=360, legend=False), width="stretch")
     theme.source_note(
         "Median RUL (days) per well from the trained discrete-time hazard model, "
-        "soonest first; bar color flags urgency (red = soonest).")
-    st.dataframe(table.head(25), width="stretch", hide_index=True)
+        "soonest first. Color = absolute urgency: red < 30 d, amber 30–60 d, "
+        "green > 60 d. Every well charted here crosses 50% survival within the model "
+        "horizon — they are all workover candidates, ranked by lead time.")
+    show = table.rename(columns={
+        "well_id": "Well", "median_rul_days": "Median RUL (days)",
+        "surv_at_horizon": f"Survival @ {sm.max_horizon}d"})
+    # Right-censoring honesty (audit): wells whose median RUL never crosses 50% inside the
+    # model horizon are pinned at the cap — flag them so the tail does not read as a fine
+    # ranking ("13 of 25 tied at 90 d").
+    show["Censored (≥ horizon)"] = show["Median RUL (days)"] >= sm.max_horizon
+    n_cens = int(show["Censored (≥ horizon)"].sum())
+    st.dataframe(
+        show.head(25), width="stretch", hide_index=True,
+        column_config={
+            "Median RUL (days)": st.column_config.NumberColumn(format="%.0f"),
+            "Censored (≥ horizon)": st.column_config.CheckboxColumn(
+                f"≥ {sm.max_horizon}d (censored)", disabled=True),
+            f"Survival @ {sm.max_horizon}d": st.column_config.ProgressColumn(
+                min_value=0.0, max_value=1.0, format="%.2f")})
+    if n_cens:
+        st.caption(f"⚠️ {n_cens} well(s) are right-censored at the {sm.max_horizon}-day "
+                   "horizon (survival never reaches 50% in-window) — their median RUL is "
+                   f"a floor of ‘> {sm.max_horizon}d’, not a precise rank among themselves.")
+    st.download_button("Download RUL Table (CSV)", data=show.to_csv(index=False),
+                       file_name="workbench_run_life.csv", mime="text/csv")
 
     # ---- per-well survival + hazard ------------------------------------------------
-    wid = _common.current_well()
-    pt.section("Per-Well Survival & Hazard")
-    if wid not in features.index:
-        pt.empty_state(
-            f"{wid} is not scorable — the run-life lens needs fleet SCADA, which "
-            "only the synthetic well_0NN fleet carries.",
-            "Pick a SCADA well in the Well Browser.")
+    pt.section("Per-Well Survival & Hazard",
+               "Pick any scorable well — defaults to your global selection when it "
+               "has SCADA telemetry.")
+    scorable = sorted(features.index)
+    glob = _common.current_well()
+    target = glob if glob in features.index else (scorable[0] if scorable else glob)
+    if not scorable:
+        pt.empty_state("No scorable SCADA wells in the fleet.")
         theme.references(["survival"])
         return
+    rul_map = dict(zip(table["well_id"], table["median_rul_days"]))
+    st.session_state["rl_pick"] = target
+    wid = st.selectbox(
+        "Well (scorable SCADA fleet)", scorable, key="rl_pick",
+        format_func=lambda w: f"{w} — median RUL {int(rul_map.get(w, 0))}d",
+        on_change=_sync_rl_well)
+    if glob not in features.index:
+        st.caption(f"The globally selected well has no SCADA telemetry, so this "
+                   f"section is showing **{wid}**.")
+    st.caption(
+        "Headline C-index / IBS above are **out-of-fold** (held-out CV); the per-well "
+        "curve and median RUL below are from the **full-fit** model (trained on the whole "
+        "fleet) — standard practice, but they are not the same estimator, so read the "
+        "metrics as the generalization claim and the curve as this well's fitted forecast.")
+
+    # Failure-mode annotation, matching what the Failure-Risk page shows for the SAME well.
+    try:
+        mode, evidence = core.esp_explainer.classify_failure_mode(
+            features.loc[wid].to_dict())
+    except Exception:  # noqa: BLE001
+        mode, evidence = None, ""
 
     days, surv_all = sm.survival_grid(features.loc[[wid]])
     surv = surv_all[0]
@@ -109,7 +164,7 @@ def render() -> None:
                            annotation_text=f"median RUL ≈ {med_rul}d",
                            annotation_position="top")
         sfig.update_layout(title=f"Survival — {wid}",
-                           xaxis_title="Days from today",
+                           xaxis_title="Run-days ahead",
                            yaxis_title="P(survives past day t)",
                            yaxis_range=[0, 1.02])
         st.plotly_chart(theme.style_fig(sfig, height=330), width="stretch")
@@ -120,12 +175,19 @@ def render() -> None:
                                   line=dict(color=theme.RED, width=2),
                                   hovertemplate="day %{x}: h=%{y:.2%}<extra></extra>"))
         hfig.update_layout(title=f"Daily Hazard — {wid}",
-                           xaxis_title="Days from today",
+                           xaxis_title="Run-days ahead",
                            yaxis_title="P(fail on day t | survived to t)")
         st.plotly_chart(theme.style_fig(hfig, height=330), width="stretch")
 
-    st.metric(f"Median RUL — {wid}",
-              f">{sm.max_horizon}d" if capped else f"{med_rul} days")
+    mc1, mc2 = st.columns(2)
+    mc1.metric(f"Median RUL — {wid}",
+               f">{sm.max_horizon}d (censored)" if capped else f"{med_rul} days")
+    if mode:
+        mc2.metric("Suspected Failure Mode", mode,
+                   help="From the same deterministic classifier the Failure-Risk page "
+                        "uses on this well's latest telemetry")
+        if evidence:
+            st.caption(f"**Mode evidence:** {evidence}")
     theme.source_note(
         "S(t|x) and h(t|x) from the discrete-time logistic hazard "
         "(person-period expansion; Singer & Willett 2003); median RUL = first day "

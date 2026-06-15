@@ -9,7 +9,8 @@ dist/
 build/
 *.egg-info/
 .streamlit/secrets.toml
-artifacts/
-data/synthetic/*.csv
-data/synthetic/labels.csv
+# Workbench vendoring (v0.2.0): the trained model + synthetic SCADA are COMMITTED so
+# the consolidated product loads with no first-run training. They are deterministic
+# (seed 7 / fixed-seed model), so shipping them costs nothing in reproducibility.
+#   (was ignored: artifacts/  ·  data/synthetic/*.csv  ·  data/synthetic/labels.csv)
 .DS_Store
