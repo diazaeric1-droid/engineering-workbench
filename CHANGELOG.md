@@ -1,5 +1,80 @@
 # Changelog
 
+## v0.4.0 — 2026-06-15
+
+Pre-PE-peer-review hardening: a 9-domain adversarial review (each finding
+independently verified) surfaced 21 high-severity, credibility-damaging issues a
+senior PE would catch in the room. All 21 are closed here — physics, economics,
+data realism, and honest framing — with 5 new regression tests (71 total, green).
+
+### Intervention economics — now risked and self-consistent
+- **Monte-Carlo is risked by chance-of-success.** `simulate_intervention` threads
+  `prob_success`: each trial draws Bernoulli(p) and books −cost on a miss, so
+  **P(payout) is honest** (was a fantasy 100%) and a new **P(loss)** is reported.
+  Default `prob_success=1.0` keeps prior results bit-identical (backward compatible).
+- **One realized price** (deck WTI + `REALIZED_DIFFERENTIAL`) now feeds both the
+  headline risked NPV and the MC panel — no more $65-vs-$70 split on one screen.
+- The **deterministic risked NPV is overlaid** on the NPV distribution and
+  reconciles with it; the contradictory "consistent / input-uncertainty-only" copy
+  is resolved (AI Well Review + Case File).
+- **Uplift defaults recalibrated down** (acid 130→50, gas-lift 60→22, paraffin
+  40→18 BOPD, …) so risked profitability indices land in a believable ~1.5–4×
+  band instead of an indefensible 7–30× with 2-month payouts.
+
+### Gas-lift — physically realistic volumes, honest margin
+- **Synthetic fleet regenerated** with a 1000× smaller GLPC efficiency coefficient:
+  optimum injection now **~600–2,000 Mscf/d** (was single-digit Mscf/d — an instant
+  tell to any lift engineer). GLPC parameter recovery still passes its eval (fit
+  R² 0.93, optimization accuracy 0.95, economic capture ≈1.00).
+- **"Net revenue" relabeled** "oil revenue net of lift-gas cost" / "lift-gas margin"
+  everywhere (KPI, chart, source note, `glpc` docstring) with an explicit caveat
+  that it excludes LOE / compression / water disposal — it is not a full net revenue.
+  The daily-gain headline is now economically meaningful (no more "$0.00 MM/yr").
+
+### ESP failure-risk — defensible metric framing
+- The oracle panel now compares the model's **pooled out-of-fold AUROC (~0.81)** to
+  the pooled Bayes ceiling (0.853) — apples-to-apples — for **~89% of attainable
+  above-chance signal**, replacing the impossible ">100% / 0.854-above-0.853" claim
+  (a mean-of-folds vs pooled mismatch). Capture is clamped ≤100%; the ±0.17 fold
+  std and n=17 positive events are shown so the 3rd decimal isn't over-read.
+  README reworded to match.
+
+### Design section — bubble point, PVT, lift honesty
+- **Clamped bubble point is provenanced "assumed," not "derived."** When the
+  produced-GOR Standing Pb exceeds the formation-typical reservoir pressure the seed
+  caps it (fully-saturated model); Nodal + PVT now disclose the clamp and the raw
+  Standing Pb instead of silently showing Pb = Pres as a correlation result. PVT
+  also warns when the what-if Pb exceeds reservoir pressure.
+- **PVT labels corrected:** Bg `rcf/scf` → `rb/scf` (value unchanged — it was a unit
+  string error, not a 5.615× factor); oil viscosity attributed to **Beggs-Robinson**
+  (Bo/Rs/Pb remain Standing); GOR relabeled "producing GOR ≈ Rs" with an at/above-Pb
+  caveat + an out-of-black-oil-range flag for high-GOR wells.
+- **Artificial Lift** adds an **inflow-limited** gate (target ≥ ~0.95·AOF → TDH/
+  stages/BHP blanked and flagged distinctly from a pump-runout limit, off a clamped
+  inflow) and a **BEP operating-window** check (0.70–1.25× BEP, shaded on the pump
+  curve) so a below-runout-but-out-of-window design no longer passes as a bare
+  "meets target." Dropped the overstated "Hydraulic-Institute charts" claim — the
+  viscosity de-rate is labeled a simplified illustrative factor that omits Cq.
+
+### Decline & EUR — reserves framing
+- The "EUR P50 — to economic limit" metric is relabeled to the honest **displayed-
+  fan / 5-yr-horizon** value (it never reached the economic limit for most wells),
+  and the false "they sit above the econ-limit EUR" ordering sentence is removed.
+- The P10/P90 band is labeled a **qi/di fit-parameter confidence interval, not an
+  SPE-PRMS reserves range** (it omits b-factor / model / terminal-decline
+  uncertainty); the "90% probability of ≥" wording and the `prms` citation are
+  dropped from this section.
+- The fan source-note no longer claims it "starts at the last observed point" — it
+  starts from the **fitted rate at the last observed day** (the Arps fit smooths a
+  noisy/degraded tail).
+
+### Tests
+- **71 tests** (was 67): new pins for clamped-Pb provenance honesty, lift
+  inflow-limited + BEP-window flags, the Monte-Carlo chance-of-success path
+  (P(loss) ≥ miss rate; risked NPV inside the band; determinism), the oracle
+  signal-capture clamp + pooled-OOF presence, and the warm-container self-heal
+  eviction breadth. WPS → 0.2.4, PE Copilot → 0.9.3, ESP → 0.7.4, Gas-Lift → 0.2.0.
+
 ## v0.3.1 — 2026-06-15
 
 ### Fixed

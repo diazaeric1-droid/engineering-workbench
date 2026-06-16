@@ -84,13 +84,16 @@ def render() -> None:
                     else "At optimum"))
 
     pt.kpi_row([
-        {"label": "Current Injection", "value": f"{cur_inj:.2f} Mscfd"},
-        {"label": "Optimal Injection", "value": f"{opt.q_inj_opt:.2f} Mscfd",
-         "delta": f"{delta_inj:+.2f} Mscfd"},
+        {"label": "Current Injection", "value": f"{cur_inj:,.0f} Mscfd"},
+        {"label": "Optimal Injection", "value": f"{opt.q_inj_opt:,.0f} Mscfd",
+         "delta": f"{delta_inj:+,.0f} Mscfd"},
         {"label": "Oil At Optimum", "value": f"{opt.q_oil_opt:,.0f} BOPD",
          "delta": f"{opt.q_oil_opt - cur_oil:+,.0f} BOPD"},
-        {"label": "Daily Gain", "value": f"${daily_gain:,.0f}/day",
-         "delta": f"${daily_gain*365/1e6:.2f}MM/yr"},
+        {"label": "Lift-Gas Margin Gain", "value": f"${daily_gain:,.0f}/day",
+         "delta": f"${daily_gain*365/1e6:.2f}MM/yr",
+         "help": "Gain in oil revenue net of injection-gas cost from moving to the "
+                 "optimum. Excludes LOE / compression opex / water disposal — it is the "
+                 "incremental lift-gas margin, not a full project NPV."},
         {"label": "GLPC Fit R²", "value": f"{params.r2:.3f}"},
     ])
     theme.flag(status, {"Over-injected": "high", "Under-injected": "warn",
@@ -103,10 +106,10 @@ def render() -> None:
                                   line=dict(color=theme.BLUE, width=1.5)))
     fig_hist.add_hline(y=opt.q_inj_opt,
                        line=dict(color=theme.GREEN, width=1.5, dash="dot"),
-                       annotation_text=f"Opt {opt.q_inj_opt:.2f} Mscfd",
+                       annotation_text=f"Opt {opt.q_inj_opt:,.0f} Mscfd",
                        annotation_position="right")
     fig_hist.add_hline(y=cur_inj, line=dict(color=theme.AMBER, width=1.2, dash="dash"),
-                       annotation_text=f"Avg {cur_inj:.2f} Mscfd",
+                       annotation_text=f"Avg {cur_inj:,.0f} Mscfd",
                        annotation_position="right")
     fig_hist.update_layout(title=f"{wid} — Injection Rate History (Survey Embedded)",
                            xaxis_title="Date", yaxis_title="Injection gas (Mscfd)")
@@ -126,12 +129,12 @@ def render() -> None:
                                       line=dict(color=theme.BLUE, width=2)))
         fig_glpc.add_trace(go.Scatter(x=[opt.q_inj_opt], y=[opt.q_liq_opt],
                                       mode="markers",
-                                      name=f"Optimal ({opt.q_inj_opt:.2f} Mscfd)",
+                                      name=f"Optimal ({opt.q_inj_opt:,.0f} Mscfd)",
                                       marker=dict(color=theme.GREEN, size=14,
                                                   symbol="star")))
         fig_glpc.add_trace(go.Scatter(
             x=[cur_inj], y=[float(core.gla_glpc.glpc_rate(cur_inj, params))],
-            mode="markers", name=f"Current ({cur_inj:.2f} Mscfd)",
+            mode="markers", name=f"Current ({cur_inj:,.0f} Mscfd)",
             marker=dict(color=theme.AMBER, size=10, symbol="diamond")))
         fig_glpc.update_layout(title="Gas-Lift Performance Curve",
                                xaxis_title="Injection gas (Mscfd)",
@@ -147,7 +150,7 @@ def render() -> None:
                                                   oil_price, gas_cost, nri)
         fig_econ = go.Figure()
         fig_econ.add_trace(go.Scatter(x=q_range, y=net_rev, mode="lines",
-                                      name="Net revenue/day",
+                                      name="Oil revenue − lift-gas cost",
                                       line=dict(color=theme.BLUE, width=2),
                                       fill="tozeroy",
                                       fillcolor="rgba(79,129,189,0.08)"))
@@ -161,13 +164,16 @@ def render() -> None:
                                       marker=dict(color=theme.AMBER, size=10,
                                                   symbol="diamond")))
         fig_econ.add_hline(y=0, line=dict(color=theme.RED, width=1, dash="dot"))
-        fig_econ.update_layout(title="Net Revenue Vs. Injection Rate",
+        fig_econ.update_layout(title="Oil Revenue (Net Of Lift-Gas) Vs. Injection Rate",
                                xaxis_title="Injection gas (Mscfd)",
-                               yaxis_title="Net revenue ($/day)")
+                               yaxis_title="Oil revenue − lift-gas cost ($/day)")
         st.plotly_chart(theme.style_fig(fig_econ, height=330), width="stretch")
         theme.source_note(
-            "Net revenue = BOPD × (1 − WC) × price × NRI − Qinj × gas_cost; optimum "
-            "from dNet/dQinj = 0 (closed form, no search).")
+            "Objective = BOPD × (1 − WC) × price × NRI − Qinj × gas_cost (oil revenue net "
+            "of injection-gas cost only — it does NOT subtract LOE, compression opex, or "
+            "water disposal, so it is the lift-gas margin, not a full net revenue). The "
+            "injection optimum from dNet/dQinj = 0 (closed form) is unchanged by those "
+            "fixed per-bbl costs.")
 
     # ---- fit validation vs known ground truth -----------------------------------
     truth = core.gla_ground_truth()
@@ -179,7 +185,7 @@ def render() -> None:
                    "claim about the live-deck optimum.")
         spec = [("q_sl (blpd)", params.q_sl, float(t["q_sl"]), 1),
                 ("q_max (blpd)", params.q_max, float(t["q_max"]), 1),
-                ("a (Mscfd⁻¹)", params.a, float(t["a"]), 3),
+                ("a (Mscfd⁻¹)", params.a, float(t["a"]), 5),
                 ("Water cut", wc, float(t["water_cut"]), 3)]
         val_df = pd.DataFrame([
             {"Parameter": name, "Fitted": round(fv, nd), "True": round(tv, nd),
@@ -197,13 +203,13 @@ def render() -> None:
                              format="%.1f%%")})
         with ckpi:
             pt.kpi_row([
-                {"label": "Optimum (fitted)", "value": f"{opt.q_inj_opt:.2f} Mscfd"},
+                {"label": "Optimum (fitted)", "value": f"{opt.q_inj_opt:,.0f} Mscfd"},
                 {"label": "Optimum (true params)",
-                 "value": f"{true_opt.q_inj_opt:.2f} Mscfd",
-                 "delta": f"{opt.q_inj_opt - true_opt.q_inj_opt:+.2f}"},
+                 "value": f"{true_opt.q_inj_opt:,.0f} Mscfd",
+                 "delta": f"{opt.q_inj_opt - true_opt.q_inj_opt:+,.0f}"},
             ])
             st.caption(f"At the current deck the fitted-curve optimum lands within "
-                       f"**{opt_abs_err:.2f} Mscfd** of the optimum from the TRUE "
+                       f"**{opt_abs_err:,.0f} Mscfd** of the optimum from the TRUE "
                        "parameters — fit error barely moves the recommendation.")
         theme.source_note(
             "Parameter recovery vs. the generator's committed ground_truth.csv; the "
@@ -214,10 +220,11 @@ def render() -> None:
     rec_kind = {"Reduce": "bad", "Increase": "warn", "Maintain": "ok"}[direction]
     st.markdown(
         f"{pt.pill(direction + ' injection', rec_kind)} "
-        f"**{cur_inj:.2f} → {opt.q_inj_opt:.2f} Mscfd** · expected "
-        f"**{opt.q_oil_opt:.0f} BOPD** (from {cur_oil:.0f}) · daily net revenue "
-        f"**${opt.net_revenue_per_day:,.0f}/day** (from ${cur_rev:,.0f}/day) · gain "
-        f"**${daily_gain:,.0f}/day (${daily_gain*365/1e6:.2f}MM/yr)**.",
+        f"**{cur_inj:,.0f} → {opt.q_inj_opt:,.0f} Mscfd** · expected "
+        f"**{opt.q_oil_opt:,.0f} BOPD** (from {cur_oil:,.0f}) · oil revenue net of "
+        f"lift-gas **${opt.net_revenue_per_day:,.0f}/day** (from ${cur_rev:,.0f}/day) · "
+        f"gain **${daily_gain:,.0f}/day (${daily_gain*365/1e6:.2f}MM/yr)** — lift-gas "
+        "margin only, before LOE / compression / water disposal.",
         unsafe_allow_html=True)
     st.caption("Derived analytically — marginal revenue set equal to marginal gas "
                "cost; pure petroleum-engineering math, no LLM.")

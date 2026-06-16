@@ -23,6 +23,23 @@ def bootstrapped():
     return True
 
 
+# ------------------------------------------------ warm-container self-heal breadth
+def test_app_self_heal_evicts_first_party_views_modules():
+    """Regression: the deployed app crashed with `vc.well_choices_for` AttributeError
+    because the warm-container self-heal evicted only theme/fleet_registry/product_theme,
+    leaving a STALE `views._common` (from a prior deploy, before that symbol existed) in
+    sys.modules. The heal must evict the `views` package + every first-party module so a
+    redeploy reliably reloads new symbols. Guards the eviction breadth at the source level
+    (the AppTest smoke runs in a fresh process and cannot reproduce warm-container staleness)."""
+    src = (REPO_ROOT / "app.py").read_text()
+    assert '"views"' in src, "self-heal must evict the views package (and its submodules)"
+    assert "startswith(" in src, "self-heal must evict submodules, not just top-level names"
+    assert "_workbench_healed" in src, "self-heal must stay gated once per session"
+    # the symbol that crashed must exist on the module app.py binds as `vc`
+    from views import _common as vc
+    assert hasattr(vc, "well_choices_for")
+
+
 # ---------------------------------------------------------------- navigation spec
 def test_navigation_page_list_matches_design():
     assert list(PAGES) == ["Fleet", "Design", "Diagnose", "Predict",

@@ -123,8 +123,9 @@ def render() -> None:
             f"({seed.formation}). Edit any input to run a what-if.")
 
         pt.section("Fluid Properties Vs. Pressure",
-                   "Standing oil FVF/Rs/viscosity; Dranchuk–Abou-Kassem gas z-factor "
-                   "with Sutton pseudo-criticals; McCain water properties.")
+                   "Standing oil FVF / Rs / bubble point; Beggs-Robinson live-oil "
+                   "viscosity; Dranchuk–Abou-Kassem gas z-factor with Sutton "
+                   "pseudo-criticals; McCain water properties.")
 
         # --- seed the four fluid inputs from the selected well's design seed ---------
         # Set the key-backed value BEFORE the widget instantiates, gated on a per-well
@@ -147,8 +148,11 @@ def render() -> None:
             f"({'real — Colorado ECMC' if seed.source == 'real' else 'synthetic fleet'}): "
             f"oil API {api_seed:.0f}° ({prov.get('oil_api', 'assumed')}), "
             f"gas SG {sg_seed:.2f} ({prov.get('gas_sg', 'assumed')}), "
-            f"Rs {gor_seed:,.0f} scf/STB ({prov.get('gor_scf_stb', 'derived')}), "
+            f"producing GOR ≈ Rs {gor_seed:,.0f} scf/STB "
+            f"({prov.get('gor_scf_stb', 'derived')}), "
             f"BHT {temp_seed:.0f}°F ({prov.get('temp_bottom_f', 'derived')}). "
+            "Solution Rs is approximated by the well's latest-month *producing* GOR "
+            "(valid at/above Pb; it overstates Rs for high-GOR wells). "
             "Editable — measured > derived > assumed; see the well's Case File for the "
             "full provenance map.")
 
@@ -159,8 +163,11 @@ def render() -> None:
             sg = st.slider("Gas Specific Gravity (air=1)", _SG_MIN, _SG_MAX, step=0.01,
                            key="pvt_sg")
         with c2:
-            gor = st.slider("Solution GOR, Rs (scf/STB)", _GOR_MIN, _GOR_MAX, step=50.0,
-                            key="pvt_gor")
+            gor = st.slider("Producing GOR ≈ Rs (scf/STB)", _GOR_MIN, _GOR_MAX, step=50.0,
+                            key="pvt_gor",
+                            help="Producing GOR used as a proxy for solution Rs. Valid "
+                                 "at/above the bubble point; overstates Rs for high-GOR "
+                                 "(volatile-oil / gas-condensate) wells.")
             temp = st.slider("Reservoir Temperature (°F)", _TEMP_MIN, _TEMP_MAX,
                              step=5.0, key="pvt_temp")
         with c3:
@@ -175,6 +182,25 @@ def render() -> None:
             n_points=48, gas_dryness=dryness)
         df = _pvt_table(pvt_in)
         pb = _bubble_point(pvt_in)
+
+        # Consistency / range guards (mirror the Nodal view's treatment so the two pages
+        # can't show contradictory bubble points). The seed caps Pb at reservoir pressure;
+        # the PVT what-if does not, so a high seeded/edited GOR can produce a Pb that sits
+        # above the well's static pressure — physically the fluid would be undersaturated
+        # (or volatile-oil / gas-condensate) and the black-oil Standing Pb is not real.
+        p_res_seed = float(seed.reservoir_pressure_psia)
+        if pb > p_res_seed:
+            st.warning(
+                f"Computed Pb ({pb:,.0f} psia) exceeds this well's reservoir pressure "
+                f"({p_res_seed:,.0f} psia): at the seeded GOR the fluid is undersaturated "
+                "or volatile — the black-oil Standing Pb is not physical here, and the "
+                "Nodal page caps it at reservoir pressure. Lower the GOR for a saturated "
+                "black-oil model.")
+        if float(seed.gor_scf_stb) > 3000.0:
+            st.caption(
+                f"⚠︎ This well's producing GOR ({seed.gor_scf_stb:,.0f} scf/STB) is above "
+                "the ~3,000 scf/STB black-oil window (slider capped there) — Standing PVT "
+                "is out of range; treat these properties as indicative only.")
 
         # Bo at the bubble point (Bob) is the canonical reservoir-engineering reference;
         # above Pb the undersaturated oil compresses and Bo DECLINES, so the last-row
@@ -193,7 +219,7 @@ def render() -> None:
              "help": "Undersaturated oil FVF at the top of the chosen pressure range — "
                      "lower than Bob because the oil compresses above the bubble point."},
             {"label": "Oil μ @ Pmin", "value": f"{df['oil_viscosity'].iloc[0]:.3f} cP",
-             "help": f"Live-oil viscosity (Standing) at {p_lo:,} psia."},
+             "help": f"Live-oil viscosity (Beggs-Robinson) at {p_lo:,} psia."},
         ])
 
         cL, cR = st.columns(2)
@@ -233,11 +259,11 @@ def render() -> None:
                                xaxis_title="Pressure (psia)", yaxis_title="z (-)")
             st.plotly_chart(theme.style_fig(figz, height=280), width="stretch")
         with cG:
-            # Bg (gas FVF, rcf/scf) and gas viscosity (cP) on twin axes — both are in
+            # Bg (gas FVF, rb/scf) and gas viscosity (cP) on twin axes — both are in
             # the PVT table the engine returns and a PE expects to see them on a
-            # black-oil/gas lens.
+            # black-oil/gas lens. (bluebonnet returns Bg in reservoir bbl/scf, not rcf/scf.)
             figg = go.Figure()
-            figg.add_scatter(x=df["pressure"], y=df["Bg"], name="Bg (gas FVF, rcf/scf)",
+            figg.add_scatter(x=df["pressure"], y=df["Bg"], name="Bg (gas FVF, rb/scf)",
                              line=dict(color=theme.GREEN), yaxis="y1")
             figg.add_scatter(x=df["pressure"], y=df["gas_viscosity"],
                              name="μ_gas (cP)", line=dict(color=theme.AMBER, dash="dot"),
@@ -245,7 +271,7 @@ def render() -> None:
             figg.update_layout(
                 title="Gas FVF (Bg) & Gas Viscosity",
                 xaxis_title="Pressure (psia)",
-                yaxis=dict(title="Bg (rcf/scf)"),
+                yaxis=dict(title="Bg (rb/scf)"),
                 yaxis2=dict(title="μ_gas (cP)", overlaying="y", side="right",
                             showgrid=False))
             st.plotly_chart(theme.style_fig(figg, height=280), width="stretch")
@@ -260,11 +286,12 @@ def render() -> None:
             key="pvt_dl")
 
         theme.source_note(
-            f"Black-oil & gas PVT for {seed.well_id} via bluebonnet: oil Bo/Rs/viscosity "
-            "by Standing; gas z-factor by Dranchuk–Abou-Kassem with Sutton "
-            "pseudo-criticals (Bg & μ_gas from the same gas model); water by McCain. "
-            "Pressure psia; FVF rb/stb (Bg rcf/scf); viscosity cP; Rs scf/STB. Inputs "
-            "seeded from the selected well, then editable.")
+            f"Black-oil & gas PVT for {seed.well_id} via bluebonnet: oil Bo/Rs/Pb by "
+            "Standing, oil viscosity by Beggs-Robinson; gas z-factor by Dranchuk–"
+            "Abou-Kassem with Sutton pseudo-criticals (Bg & μ_gas from the same gas "
+            "model); water by McCain. Pressure psia; FVF rb/stb (Bg rb/scf); viscosity "
+            "cP; Rs scf/STB (proxy = producing GOR). Inputs seeded from the selected "
+            "well, then editable.")
         theme.references(["pvt", "bluebonnet"])
 
     # ----------------------------------------------------- physics production curve

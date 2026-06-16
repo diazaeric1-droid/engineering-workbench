@@ -48,8 +48,11 @@ def _prefit_calibrator(estimator, method: str = "sigmoid") -> CalibratedClassifi
 
 @dataclass
 class TrainResult:
-    auroc_cv_mean: float               # out-of-fold AUROC (the number to trust)
-    auroc_cv_std: float
+    auroc_cv_mean: float               # mean of per-fold out-of-fold AUROCs
+    auroc_cv_std: float                # std across folds (sampling spread on few positives)
+    auroc_oof_pooled: float            # AUROC on the POOLED OOF predictions (all wells at
+    #                                    once) — the apples-to-apples match to the pooled
+    #                                    oracle ceiling; the number to compare to the ceiling
     precision_at_top10pct: float       # OOF: of the top-10% flagged, fraction that fail
     recall_at_top10pct: float          # OOF: of all failures, fraction in the top-10%
     n_flagged_top10pct: int            # how many wells "top 10%" is, on this fleet
@@ -121,7 +124,13 @@ class ESPRiskModel:
                 aucs.append(roc_auc_score(yv[te], p))
         mean = float(np.mean(aucs)) if aucs else float("nan")
         std = float(np.std(aucs)) if aucs else float("nan")
-        return mean, std, oof
+        # Pooled OOF AUROC: score the whole OOF vector at once (the way the oracle ceiling
+        # is computed). This is the honest, ceiling-comparable number — typically a touch
+        # below the mean-of-folds and never artificially above the ceiling.
+        valid = ~np.isnan(oof)
+        pooled = (float(roc_auc_score(yv[valid], oof[valid]))
+                  if len(np.unique(yv[valid])) > 1 else float("nan"))
+        return mean, std, pooled, oof
 
     @staticmethod
     def _precision_recall_at_k(y, p, frac: float = 0.1):
@@ -164,7 +173,7 @@ class ESPRiskModel:
         y = y.astype(int)
 
         # 1) Honest generalisation metrics from out-of-fold predictions.
-        cv_mean, cv_std, oof = self._cross_validate(X, y)
+        cv_mean, cv_std, cv_pooled, oof = self._cross_validate(X, y)
         prec, rec, k = self._precision_recall_at_k(y, oof, frac=0.1)
         reliability, brier = self._reliability(y, oof)
 
@@ -199,7 +208,7 @@ class ESPRiskModel:
 
         importance = dict(zip(self.feature_names, self.model.feature_importances_))
         return TrainResult(
-            auroc_cv_mean=cv_mean, auroc_cv_std=cv_std,
+            auroc_cv_mean=cv_mean, auroc_cv_std=cv_std, auroc_oof_pooled=cv_pooled,
             precision_at_top10pct=prec, recall_at_top10pct=rec, n_flagged_top10pct=k,
             brier=brier, n_wells=int(len(y)), n_positives=int(y.sum()),
             calibrated=self.calibrator is not None,

@@ -134,9 +134,12 @@ def render() -> None:
             theme.flag(f"On type curve ({dev:+.1f}%) — {note}", "ok")
 
     # ---- Monte-Carlo bands + probabilistic NPV --------------------------------
-    pt.section("Probabilistic Forecast — P90/P50/P10 (Monte-Carlo, prodpy)",
-               "500 seeded Arps parameter draws; shaded band = P90–P10 rate fan. "
-               "Reserves convention: P90 conservative ≤ P50 ≤ P10 (SPE-PRMS).")
+    pt.section("Probabilistic Forecast — Arps fit-parameter band (Monte-Carlo, prodpy)",
+               "500 seeded Arps draws from the fitted qi/di sampling distribution; "
+               "shaded band = P90–P10 rate fan. This is a **fit-parameter confidence "
+               "interval (qi/di covariance only)** — it does NOT inject b-factor, model, "
+               "or terminal-decline uncertainty, so it is tighter than a true SPE-PRMS "
+               "reserves P90/P50/P10. Read it as forecast precision, not booked reserves.")
     fb = _common.forecast_bands_cached(wid)
     if fb is None:
         pt.empty_state("Monte-Carlo bands unavailable for this well (prodpy fit "
@@ -180,10 +183,13 @@ def render() -> None:
             st.plotly_chart(theme.style_fig(fig_fan, height=340), width="stretch")
             econ_lim = float(core.pec_assumptions.ECONOMIC_LIMIT_BOPD)
             theme.source_note(
-                "Arps decline fit with Monte-Carlo P90/P50/P10 bands (prodpy, "
-                f"R²={fb.r_squared:.3f}, seed 42). The rate fan starts at the last "
-                f"observed point and is drawn to where the P50 path reaches the "
-                f"{econ_lim:.0f} BOPD economic limit (its visual endpoint).")
+                "Arps decline fit with Monte-Carlo qi/di bands (prodpy, "
+                f"R²={fb.r_squared:.3f}, seed 42). The fan starts from the **fitted** "
+                "rate at the last observed day (not the last raw datum) — the Arps fit "
+                "smooths a noisy/degraded tail, so it can begin slightly above or below "
+                "the final actual marker. It is drawn over the 5-yr forecast horizon, "
+                f"truncating early only if the P50 path reaches the {econ_lim:.0f} BOPD "
+                "economic limit first (most wells do not within 5 yr).")
         with eur_col:
             # EUR reconciliation (audit): the prodpy EUR percentiles integrate the FULL
             # forecast horizon, but the fan is shown only to the economic limit — so a PE
@@ -193,26 +199,35 @@ def render() -> None:
             # full-horizon percentile EURs.
             econ_fc_cum = float(_trapezoid(np.asarray(fb.p50_rate, float),
                                            np.asarray(fb.days, float)))
-            eur_p50_econ = fb.cum_history_bbl + max(econ_fc_cum, 0.0)
-            st.metric("EUR P50 — to economic limit",
-                      f"{eur_p50_econ/1000:,.0f} MBO",
-                      help=f"Reserves-style: history cum + ∫P50 forecast to the "
-                           f"{core.pec_assumptions.ECONOMIC_LIMIT_BOPD:.0f} BOPD econ "
-                           "limit (the fan's endpoint).")
+            eur_p50_disp = fb.cum_history_bbl + max(econ_fc_cum, 0.0)
+            st.metric("EUR P50 — displayed fan",
+                      f"{eur_p50_disp/1000:,.0f} MBO",
+                      help="History cum + ∫P50 over the displayed rate fan, which runs to "
+                           "the 5-yr forecast horizon (or the "
+                           f"{core.pec_assumptions.ECONOMIC_LIMIT_BOPD:.0f} BOPD economic "
+                           "limit if the P50 reaches it first). For most wells the P50 "
+                           "does not reach the limit within 5 yr, so this is effectively "
+                           "the 5-yr-horizon EUR — close to the full-horizon P50 below, "
+                           "not a separate bookable-to-abandonment number.")
             pt.kpi_row([
-                {"label": "EUR P90 (full horizon)", "value": f"{fb.eur_p90/1000:,.0f} MBO",
-                 "help": "Conservative — 90% chance of exceeding; integrates the full "
-                         "Monte-Carlo horizon (no econ-limit cut)"},
+                {"label": "EUR P90 (fit band)", "value": f"{fb.eur_p90/1000:,.0f} MBO",
+                 "help": "Conservative end of the qi/di fit-parameter band over the full "
+                         "5-yr horizon. NOT a booked reserves P90 — the band omits "
+                         "b-factor/model/terminal-decline uncertainty, so it is tighter "
+                         "than a true reserves range."},
                 {"label": "EUR P50 (full horizon)", "value": f"{fb.eur_p50/1000:,.0f} MBO"},
-                {"label": "EUR P10 (full horizon)", "value": f"{fb.eur_p10/1000:,.0f} MBO",
-                 "help": "Optimistic — 10% chance of exceeding; full horizon"},
+                {"label": "EUR P10 (fit band)", "value": f"{fb.eur_p10/1000:,.0f} MBO",
+                 "help": "Optimistic end of the qi/di fit-parameter band, full 5-yr "
+                         "horizon. NOT a booked reserves P10 (see P90 note)."},
             ])
             st.caption(
-                f"History cum ≈ {fb.cum_history_bbl/1000:,.0f} MBO. The econ-limit EUR is "
-                "the bookable number; the full-horizon percentile EURs integrate every "
-                "sampled curve to the model horizon (they sit above the econ-limit EUR). "
-                "History cum is a trapezoidal integral of the reported monthly stream — "
-                "on a gappy/shut-in tail treat it as approximate.")
+                f"History cum ≈ {fb.cum_history_bbl/1000:,.0f} MBO. The displayed-fan EUR "
+                "above and the full-horizon P50 here both integrate the P50 path to the "
+                "5-yr horizon, so they are close — neither is a true to-abandonment "
+                "reserves number (extend the horizon for that). The P90/P10 spread is the "
+                "qi/di fit-parameter band, not an SPE-PRMS reserves range. History cum is "
+                "a trapezoidal integral of the reported monthly stream — on a gappy/"
+                "shut-in tail treat it as approximate.")
 
             oil_price, nri, discount = _common.deck()
             try:
@@ -234,4 +249,4 @@ def render() -> None:
                     f"LOE, {discount:.0%} discount (pec economics convention). Values "
                     "the existing producing stream — no upfront capital.")
 
-    theme.references(["arps", "dca_lib", "monte_carlo", "prms", "npv"])
+    theme.references(["arps", "dca_lib", "monte_carlo", "npv"])

@@ -87,9 +87,9 @@ def render() -> None:
         cur_oil = float(core.gla_glpc.glpc_rate(cur, w["params"])) * (1.0 - w["water_cut"])
         rows.append({
             "Well": wid,
-            "Current Inj (Mscfd)": round(cur, 2),
-            "Allocated (Mscfd)": a["allocated_q_inj"],
-            "Unconstrained Opt (Mscfd)": round(unconstrained[wid], 2),
+            "Current Inj (Mscfd)": round(cur, 0),
+            "Allocated (Mscfd)": round(a["allocated_q_inj"], 0),
+            "Unconstrained Opt (Mscfd)": round(unconstrained[wid], 0),
             "Current BOPD": round(cur_oil, 1),
             "Allocated BOPD": a["expected_q_oil"],
             "Allocated Rev ($/day)": a["expected_net_rev_day"],

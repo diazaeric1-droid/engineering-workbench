@@ -106,6 +106,7 @@ def main():
     report = {
         "auroc_cv_mean": result.auroc_cv_mean,
         "auroc_cv_std": result.auroc_cv_std,
+        "auroc_oof_pooled": result.auroc_oof_pooled,
         "precision_at_top10pct": result.precision_at_top10pct,
         "recall_at_top10pct": result.recall_at_top10pct,
         "n_flagged_top10pct": result.n_flagged_top10pct,
@@ -121,7 +122,9 @@ def main():
     if oracle is not None:
         from .oracle import signal_capture
         report["oracle_ceiling"] = oracle.as_dict()
-        report["signal_capture"] = signal_capture(result.auroc_cv_mean, oracle.auroc)
+        # Compare the POOLED OOF AUROC to the pooled oracle ceiling — apples-to-apples;
+        # the mean-of-folds can sit spuriously above the ceiling on a few positives.
+        report["signal_capture"] = signal_capture(result.auroc_oof_pooled, oracle.auroc)
     if survival_eval is not None:
         report["survival_eval"] = survival_eval.as_dict()
     with open("artifacts/training_report.json", "w") as f:

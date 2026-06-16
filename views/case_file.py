@@ -142,12 +142,18 @@ def _econ_lens(wid: str, oil_price: float, discount: float) -> dict | None:
     d = core.pec_assumptions.intervention_defaults(row.intervention)
     if not d:
         return None
+    # One realized price (deck WTI + basis differential) and risk by chance-of-success, so
+    # this panel matches the AI Review and the risked point NPV — not a 100%-payout fantasy
+    # off the raw deck price (PE review #18/#19).
+    realized = float(oil_price) + float(core.pec_assumptions.REALIZED_DIFFERENTIAL)
+    p_succ = float(d.get("p_success", 1.0))
     try:
         sim = core.pec_economics.simulate_intervention(
             name=row.intervention, treatment_cost_usd=d["cost_usd"],
             incremental_rate_bopd=d["uplift_bopd"], uplift_decline_per_yr=d["uplift_decline"],
-            realized_price_per_bbl=oil_price, discount_rate=discount,
-            opex_per_bbl=float(core.pec_assumptions.LOE_USD_PER_BBL), seed=42)
+            realized_price_per_bbl=realized, discount_rate=discount,
+            opex_per_bbl=float(core.pec_assumptions.LOE_USD_PER_BBL),
+            prob_success=p_succ, seed=42)
     except Exception:  # noqa: BLE001
         return None
     tordata = sim.get("tornado", {})
@@ -155,6 +161,7 @@ def _econ_lens(wid: str, oil_price: float, discount: float) -> dict | None:
     return {"intervention": row.intervention, "npv_p90": sim["npv_p90_usd"],
             "npv_p50": sim["npv_p50_usd"], "npv_p10": sim["npv_p10_usd"],
             "prob_payout": sim["probability_of_payout"],
+            "prob_loss": sim.get("probability_of_loss", 0.0), "prob_success": p_succ,
             "top_driver": top[0], "top_swing": (top[1]["swing"] if top[1] else 0.0)}
 
 
@@ -215,10 +222,12 @@ def _markdown_case_file(wid: str, ident: dict, deck: tuple, dec, risk, gl, des,
     if econ:
         lines.append(f"- Indicated **{econ['intervention']}** · NPV P90/P50/P10: "
                      f"{econ['npv_p90']/1e3:,.0f} / {econ['npv_p50']/1e3:,.0f} / "
-                     f"{econ['npv_p10']/1e3:,.0f} k$ · P(payout) **{econ['prob_payout']:.0%}**")
+                     f"{econ['npv_p10']/1e3:,.0f} k$ · P(payout) **{econ['prob_payout']:.0%}** "
+                     f"· P(loss) **{econ.get('prob_loss', 0.0):.0%}**")
         if econ.get("top_driver"):
             lines.append(f"- Largest NPV swing driven by **{econ['top_driver']}** "
-                         f"(±${econ['top_swing']/1e3:,.0f}k) — 10k-trial Monte-Carlo, seed 42")
+                         f"(±${econ['top_swing']/1e3:,.0f}k) — 10k-trial Monte-Carlo risked "
+                         f"by the {econ.get('prob_success', 1.0):.0%} chance-of-success, seed 42")
     else:
         lines.append("- _Lens unavailable — needs a production well with an economic "
                      "indicated intervention._")
@@ -408,13 +417,16 @@ def render() -> None:
             {"label": "NPV P10", "value": _usd_compact(econ["npv_p10"]),
              "help": "Optimistic (P10)"},
             {"label": "P(payout)", "value": f"{econ['prob_payout']:.0%}"},
+            {"label": "P(loss)", "value": f"{econ.get('prob_loss', 0.0):.0%}",
+             "help": f"NPV<0, incl. the {1 - econ.get('prob_success', 1.0):.0%} chance the "
+                     "job misses and the capital is sunk."},
         ])
         if econ.get("top_driver"):
             st.caption(f"Largest NPV swing driven by **{econ['top_driver']}** "
                        f"(±{_usd_compact(econ['top_swing'])}). 10k-trial Monte-Carlo over "
-                       "rate/decline/price uncertainty (seed 42); see Diagnose → AI Well "
-                       "Review for the full distribution + tornado. Distinct from the "
-                       "chance-of-success-risked point NPV.")
+                       "rate/decline/price uncertainty, RISKED by the "
+                       f"{econ.get('prob_success', 1.0):.0%} chance-of-success (seed 42); "
+                       "see Diagnose → AI Well Review for the full distribution + tornado.")
     else:
         pt.empty_state("Lens unavailable — needs a production well whose indicated "
                        "intervention is economic (monitor / P&A / insufficient-data wells "

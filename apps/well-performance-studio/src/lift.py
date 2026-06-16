@@ -101,21 +101,24 @@ class PumpModel:
                             visc_cp: float = 1.0) -> float:
         """Viscosity-corrected head per stage (ft) — the curve the design point lands on.
 
-        Identical to :meth:`head_per_stage` but with the Hydraulic-Institute viscosity
-        head de-rate ``ch`` applied, so the plotted curve and the design-point marker
-        share one correction (audit: 'design point floats off its own curve at high
-        viscosity').
+        Identical to :meth:`head_per_stage` but with the simplified viscosity head
+        de-rate ``ch`` applied (see :func:`_visc_correction` — illustrative, not the
+        full HI 9.6.7 chart), so the plotted curve and the design-point marker share one
+        correction (audit: 'design point floats off its own curve at high viscosity').
         """
         ch, _ = _visc_correction(visc_cp)
         return float(self.head_per_stage(q_bpd, freq_hz) * ch)
 
 
 def _visc_correction(mu_cp: float) -> tuple[float, float]:
-    """Basic viscosity de-rating factors (head, efficiency) for a centrifugal pump.
+    """Simplified illustrative viscosity de-rate factors (head, efficiency).
 
-    A compact stand-in for the standard pump viscosity-correction charts (Hydraulic
-    Institute / vendor): below ~10 cP the pump behaves as on water (factors ~1); as
-    viscosity rises, head and especially efficiency fall. Smooth, monotone, bounded.
+    A compact, smooth, monotone stand-in that captures the *direction* of the standard
+    pump viscosity-correction charts — NOT the full ANSI/HI 9.6.7 procedure. In
+    particular it returns only head (Ch) and efficiency (Ceta) de-rates and OMITS the
+    rate correction (Cq); it is not keyed off the pump BEP/rpm B-parameter. Below ~10 cP
+    the pump behaves as on water (factors ~1); as viscosity rises, head and especially
+    efficiency fall. Treat the factors as indicative for sizing, not a chart lookup.
     """
     mu = max(float(mu_cp), 1.0)
     if mu <= 10.0:
@@ -150,6 +153,12 @@ class ESPDesign:
     feasible: bool = True           # False when design fluid rate >= pump runout
     stages_capped: bool = False     # True when stage count was clamped at MAX_STAGES
     meets_target_tol: float = 0.98  # tolerance the meets_target check uses (fraction)
+    # ---- inflow + operating-window checks (added for the PE peer review) ----
+    aof_stb_d: float = 0.0          # the IPR's absolute open-flow potential, STB/d
+    inflow_limited: bool = False    # target >= ~0.95*AOF: reservoir, not the pump, is the cap
+    q_bep_at_freq_bpd: float = 0.0  # best-efficiency-point flow at the selected frequency
+    bep_ratio: float = 1.0          # design total-fluid rate / q_bep_at_freq
+    bep_ok: bool = True             # design sits inside the ~0.70-1.25x BEP recommended window
     notes: str = ""
 
 
@@ -217,9 +226,19 @@ def design_esp(
     depth = float(pump_depth_ft) if pump_depth_ft else float(vlp.depth_ft) - 500.0
     depth = max(depth, 100.0)
 
-    # 1. pump-intake pressure: IPR pwf at target, projected to pump depth (above perfs)
+    # 0. INFLOW feasibility: the reservoir cannot deliver more than its AOF no matter how
+    #    much lift is installed. If the target is at/above ~95% of AOF the IPR pwf collapses
+    #    toward 0 and the TDH/stage/BHP sizing below is meaningless — this is an inflow
+    #    limit, not a lift limit, and must be flagged distinctly (PE review #8).
+    aof = float(ipr.aof) if np.isfinite(ipr.aof) else 0.0
+    inflow_limited = bool(aof > 0 and target_q_stb_d >= 0.95 * aof)
+
+    # 1. pump-intake pressure: IPR pwf at target, projected to pump depth (above perfs).
+    #    Clamp the interpolation explicitly so a target beyond AOF cannot silently read a
+    #    fabricated pwf=0 off np.interp's default right-edge behaviour.
     grad = _fluid_gradient_psi_ft(vlp)
-    pwf_at_target = float(np.interp(target_q_stb_d, ipr.q, ipr.pwf))
+    pwf_at_target = float(np.interp(target_q_stb_d, ipr.q, ipr.pwf,
+                                    left=float(ipr.pwf[0]), right=float(ipr.pwf[-1])))
     setting_above_perfs = max(float(vlp.depth_ft) - depth, 0.0)
     p_intake = max(pwf_at_target - grad * setting_above_perfs, 25.0)
 
@@ -245,6 +264,15 @@ def design_esp(
     stages_capped = (not feasible) or raw_stages > MAX_STAGES
     stages = min(raw_stages, MAX_STAGES)
 
+    # BEP operating-window check: a centrifugal ESP should run within roughly 0.70-1.25x of
+    # its best-efficiency point (downthrust below, upthrust/erosion above). "Below runout"
+    # is necessary but NOT sufficient — a 1.6x-BEP design wears out fast even though it is
+    # technically feasible. Flag it distinctly so a bare green "meets target" can't hide it
+    # (PE review #6). BEP flow scales linearly with frequency (affinity law).
+    q_bep_at_freq = float(pump.q_bep_bpd * max(frequency_hz, 1e-6) / pump.freq_base_hz)
+    bep_ratio = float(q_fluid / q_bep_at_freq) if q_bep_at_freq > 0 else 0.0
+    bep_ok = bool(0.70 <= bep_ratio <= 1.25)
+
     # 4. power: brake hp from the standard field formula, motor-de-rated
     eff = max(pump.efficiency(q_fluid, frequency_hz) * ce, 0.05)
     sg_fluid = grad / PSI_PER_FT_WATER  # specific gravity of the produced fluid
@@ -258,9 +286,17 @@ def design_esp(
 
     # operating point with boost: solve pwf_ipr(q) == pwf_vlp(q) - boost
     op = _operating_point_with_boost(ipr, vlp, boost_psi)
-    meets = bool(op.q_op >= 0.98 * target_q_stb_d and op.converged and feasible)
+    meets = bool(op.q_op >= 0.98 * target_q_stb_d and op.converged
+                 and feasible and not inflow_limited)
 
-    if not feasible:
+    if inflow_limited:
+        note = (
+            f"Target {target_q_stb_d:,.0f} STB/d is at/above the reservoir's AOF "
+            f"({aof:,.0f} STB/d): this is INFLOW-limited, not lift-limited — no ESP can "
+            f"pull more than the IPR delivers. TDH/stages/BHP are not meaningful here; "
+            f"lower the target below AOF or improve inflow (stimulation) first."
+        )
+    elif not feasible:
         note = (
             f"Target total fluid {q_fluid:,.0f} bpd exceeds this pump's runout "
             f"({runout:,.0f} bpd at {frequency_hz:.0f} Hz): head per stage collapses to "
@@ -268,12 +304,20 @@ def design_esp(
             f"the drive frequency. Stage count shown is capped at {MAX_STAGES}."
         )
     else:
+        bep_msg = ""
+        if not bep_ok:
+            where = "below" if bep_ratio < 0.70 else "above"
+            wear = ("downthrust / low efficiency" if bep_ratio < 0.70
+                    else "upthrust / accelerated wear & erosion")
+            bep_msg = (
+                f" Design runs at {bep_ratio:.2f}x BEP ({where} the 0.70-1.25x "
+                f"recommended window) → {wear}; resize the pump series or trim frequency.")
         note = (
             f"Pump curve: illustrative 60-Hz centrifugal (BEP {pump.q_bep_bpd:.0f} bpd, "
             f"{pump.head_per_stage(pump.q_bep_bpd):.1f} ft/stage at BEP; runout "
             f"{runout:,.0f} bpd at {frequency_hz:.0f} Hz). "
             f"Viscosity de-rate: head x{ch:.2f}, eff x{ce:.2f} at "
-            f"{fluid_viscosity_cp:.0f} cP."
+            f"{fluid_viscosity_cp:.0f} cP." + bep_msg
         )
     return ESPDesign(
         target_q_stb_d=target_q_stb_d,
@@ -294,6 +338,11 @@ def design_esp(
         feasible=bool(feasible),
         stages_capped=bool(stages_capped),
         meets_target_tol=0.98,
+        aof_stb_d=float(aof),
+        inflow_limited=bool(inflow_limited),
+        q_bep_at_freq_bpd=float(q_bep_at_freq),
+        bep_ratio=float(bep_ratio),
+        bep_ok=bool(bep_ok),
         notes=note,
     )
 

@@ -146,7 +146,11 @@ def _provenance_table(seed) -> None:
     rows = [
         ("Reservoir pressure", f"{seed.reservoir_pressure_psia:,.0f} psia",
          prov.get("reservoir_pressure_psia", "assumed")),
-        ("Bubble point", f"{seed.bubble_point_psia:,.0f} psia",
+        ("Bubble point",
+         (f"{seed.bubble_point_psia:,.0f} psia  (Standing Pb "
+          f"{seed.bubble_point_raw_psia:,.0f} > Pres → modeled saturated)"
+          if getattr(seed, "bubble_point_clamped", False)
+          else f"{seed.bubble_point_psia:,.0f} psia"),
          prov.get("bubble_point_psia", "derived")),
         ("Flow-test rate", f"{seed.test_rate_stb_d:,.0f} STB/d",
          prov.get("test_rate_stb_d", "assumed")),
@@ -271,13 +275,26 @@ def render() -> None:
 
     _provenance_table(seed)
 
-    # --- regime / consistency guards (no silent clamps) -----------------------
+    # --- regime / consistency guards ------------------------------------------
+    # The seed caps Standing Pb at reservoir pressure; surface that here (both when the
+    # user pushes the slider above Pres and when the *seeded default* was already clamped)
+    # so a fully-saturated well is never shown with Pb == Pres as if it were derived.
+    clamped_default = (bool(getattr(seed, "bubble_point_clamped", False))
+                       and abs(float(n_pb) - float(n_pres)) < 1.0)
     if n_pb > n_pres:
         st.warning(
             f"Bubble point ({n_pb:,} psia) exceeds reservoir pressure ({n_pres:,} psia)"
             " — capping it at reservoir pressure and modeling a fully saturated "
             "(solution-gas-drive) reservoir. Lower the bubble point if the reservoir is "
             "undersaturated.")
+    elif clamped_default:
+        st.info(
+            f"Bubble point shown at reservoir pressure ({n_pres:,} psia): the Standing Pb "
+            f"from the seeded producing GOR ({seed.gor_scf_stb:,.0f} scf/STB) is "
+            f"{seed.bubble_point_raw_psia:,.0f} psia — above static pressure — so this well "
+            "is modeled fully saturated (solution-gas drive). The produced GOR overstates "
+            "solution Rs for high-GOR wells; lower the GOR or bubble point if the reservoir "
+            "is undersaturated.")
     pb_eff = float(min(n_pb, n_pres))
 
     if n_ipr_mode == "Vogel (test point)":

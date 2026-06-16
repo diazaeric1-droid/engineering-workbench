@@ -181,12 +181,18 @@ def oracle_cached() -> dict | None:
         labels = core.esp_loader.load_labels(
             core.ESP_DATA / "labels.csv").set_index("well_id")["failed_within_30d"]
         ceiling = core.esp_oracle.compute_oracle_ceiling(labels)
-        model_auroc = None
+        rep = {}
         if core.ESP_TRAINING_REPORT.exists():
-            model_auroc = json.loads(core.ESP_TRAINING_REPORT.read_text()).get("auroc_cv_mean")
+            rep = json.loads(core.ESP_TRAINING_REPORT.read_text())
+        # Compare the POOLED OOF AUROC to the pooled oracle ceiling (apples-to-apples).
+        # Fall back to the mean-of-folds only on an older report that lacks the pooled key.
+        model_auroc = rep.get("auroc_oof_pooled") or rep.get("auroc_cv_mean")
         cap = (core.esp_oracle.signal_capture(model_auroc, ceiling.auroc)
                if model_auroc else None)
-        return {"ceiling": ceiling.as_dict(), "model_auroc": model_auroc, "capture": cap}
+        return {"ceiling": ceiling.as_dict(), "model_auroc": model_auroc,
+                "auroc_cv_mean": rep.get("auroc_cv_mean"),
+                "auroc_cv_std": rep.get("auroc_cv_std"),
+                "n_positives": rep.get("n_positives"), "capture": cap}
     except Exception:  # noqa: BLE001
         return None
 

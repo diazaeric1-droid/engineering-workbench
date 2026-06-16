@@ -195,21 +195,31 @@ def render() -> None:
     nat_q = op_nat.q_op if op_nat.converged else None
 
     pt.section("ESP Design")
+    # When the target is at/above the reservoir's AOF (inflow-limited) or past pump runout
+    # (infeasible), the TDH/stages/BHP sizing is not meaningful — blank those KPIs and show
+    # "—" rather than a number computed off a clamped inflow (PE review #8).
+    sizing_ok = esp.feasible and not esp.inflow_limited
+    if esp.inflow_limited:
+        stages_val, stages_help = "—", (
+            f"Inflow-limited: target ≥ reservoir AOF ({esp.aof_stb_d:,.0f} STB/d). No ESP "
+            "can pull more than the IPR delivers, so a stage count is not meaningful.")
+    elif esp.stages_capped:
+        stages_val = f"{esp.stages:,d}+"
+        stages_help = ("Capped — target exceeds the pump's runout (see flag below)."
+                       if not esp.feasible
+                       else f"Capped at {core.wps_lift.MAX_STAGES} stages — required TDH "
+                            "exceeds this pump series; select a higher-head pump.")
+    else:
+        stages_val, stages_help = f"{esp.stages:,d}", \
+            "TDH ÷ viscosity-corrected head-per-stage."
     pt.kpi_row([
-        {"label": "Stages", "value": (f"{esp.stages:,d}+" if esp.stages_capped
-                                      else f"{esp.stages:,d}"),
-         # stages_capped fires either because the target is past runout (infeasible) OR
-         # because a feasible design simply needs more than MAX_STAGES of head — distinguish
-         # them so the tooltip never points at a runout flag that isn't shown.
-         "help": ("TDH ÷ viscosity-corrected head-per-stage." if not esp.stages_capped
-                  else ("Capped — target exceeds the pump's runout (see flag below)."
-                        if not esp.feasible
-                        else f"Capped at {core.wps_lift.MAX_STAGES} stages — required TDH "
-                             "exceeds this pump series; select a higher-head pump."))},
+        {"label": "Stages", "value": stages_val, "help": stages_help},
         {"label": "Frequency", "value": f"{esp.frequency_hz:.0f} Hz"},
-        {"label": "Total Dynamic Head", "value": f"{esp.tdh_ft:,.0f} ft"},
-        {"label": "Brake Power", "value": (f"{esp.bhp:,.0f} hp" if esp.feasible else "—"),
-         "help": None if esp.feasible else "Undefined above pump runout."},
+        {"label": "Total Dynamic Head",
+         "value": (f"{esp.tdh_ft:,.0f} ft" if sizing_ok else "—"),
+         "help": None if sizing_ok else "Not meaningful (inflow-limited / above runout)."},
+        {"label": "Brake Power", "value": (f"{esp.bhp:,.0f} hp" if sizing_ok else "—"),
+         "help": None if sizing_ok else "Undefined (inflow-limited / above pump runout)."},
     ])
     pt.kpi_row([
         {"label": "Natural Rate",
@@ -219,18 +229,44 @@ def render() -> None:
                   "Nodal operating rate with no pump installed.")},
         {"label": "Rate With ESP", "value": f"{esp.op_q_stb_d:,.0f} STB/d"},
         {"label": "Pump Intake P", "value": f"{esp.pump_intake_psia:,.0f} psia"},
+        {"label": "BEP Ratio", "value": (f"{esp.bep_ratio:.2f}×" if sizing_ok else "—"),
+         "help": (f"Design total fluid ({esp.total_fluid_bpd:,.0f} bpd) ÷ best-efficiency "
+                  f"flow ({esp.q_bep_at_freq_bpd:,.0f} bpd at {esp.frequency_hz:.0f} Hz). "
+                  "Run inside ~0.70–1.25× BEP; below = downthrust, above = upthrust/erosion."
+                  if sizing_ok else "Not meaningful (inflow-limited / above runout).")},
         {"label": "Stage Efficiency", "value": f"{esp.efficiency:.0%}",
          "help": f"Viscosity de-rate at {l_visc:.0f} cP: head ×{esp.head_visc_factor:.2f}, "
                  f"eff ×{esp.eff_visc_factor:.2f}."},
     ])
 
     tol_pct = (1.0 - esp.meets_target_tol) * 100.0
-    if not esp.feasible:
+    if esp.inflow_limited:
+        theme.flag(
+            f"Target {l_target:,.0f} STB/d is at/above the reservoir's AOF "
+            f"({esp.aof_stb_d:,.0f} STB/d): this is **inflow-limited, not lift-limited** — "
+            "no ESP can produce more than the IPR delivers. Lower the target below AOF, or "
+            "improve inflow (stimulation) first. TDH / stages / BHP are blanked because "
+            "they would be computed off a clamped (pwf→0) inflow.", "high")
+    elif not esp.feasible:
         theme.flag(
             f"Target {l_target:,.0f} STB/d ({esp.total_fluid_bpd:,.0f} bpd total fluid) "
             f"exceeds this pump's runout of {esp.runout_bpd:,.0f} bpd at {l_freq:.0f} Hz. "
             "Head per stage collapses to ~0 and the stage count is unbounded — select a "
             "larger pump series or raise the drive frequency.", "high")
+    elif not esp.bep_ok:
+        where = "below" if esp.bep_ratio < 0.70 else "above"
+        wear = ("downthrust and low efficiency" if esp.bep_ratio < 0.70
+                else "upthrust, accelerated wear and erosion")
+        theme.flag(
+            f"Design runs at **{esp.bep_ratio:.2f}× BEP** ({where} the 0.70–1.25× "
+            f"recommended operating window) → {wear}. It is below runout so it 'meets "
+            "target', but a vendor would resize the pump series or trim the frequency "
+            "before accepting this point.", "warn")
+        if esp.meets_target:
+            theme.flag(f"Design meets the {l_target:,.0f} STB/d target "
+                       f"(within {tol_pct:.0f}% — reaches {esp.op_q_stb_d:,.0f} STB/d at "
+                       "the boosted operating point), but see the BEP-window note above.",
+                       "ok")
     elif esp.meets_target:
         theme.flag(f"Design meets the {l_target:,.0f} STB/d target "
                    f"(within {tol_pct:.0f}% — reaches {esp.op_q_stb_d:,.0f} STB/d at the "
@@ -258,6 +294,17 @@ def render() -> None:
             line=dict(color=theme.BLUE))
         figp.add_vline(x=esp.runout_bpd, line=dict(color=theme.GREY, dash="dot"),
                        annotation_text="runout", annotation_position="top")
+        # recommended operating window (~0.70–1.25× BEP) + BEP marker so the design point
+        # can be read against where the pump *should* run, not just against runout (#6).
+        if esp.q_bep_at_freq_bpd > 0:
+            figp.add_vrect(x0=0.70 * esp.q_bep_at_freq_bpd,
+                           x1=1.25 * esp.q_bep_at_freq_bpd,
+                           fillcolor="rgba(118,168,90,0.12)", line_width=0,
+                           annotation_text="recommended window",
+                           annotation_position="top left")
+            figp.add_vline(x=esp.q_bep_at_freq_bpd,
+                           line=dict(color=theme.GREEN, dash="dash"),
+                           annotation_text="BEP", annotation_position="bottom")
         figp.add_scatter(x=[esp.total_fluid_bpd], y=[esp.head_per_stage_ft],
                          name="Design point", mode="markers",
                          marker=dict(size=12, color=theme.GREEN, symbol="x",
@@ -313,10 +360,12 @@ def render() -> None:
                 f" Stage count is capped at {core.wps_lift.MAX_STAGES} — the target "
                 "exceeds pump runout (see flag above).")
     st.caption(
-        f"{esp.notes}{cap_note} TDH and brake horsepower per the standard "
-        "Hydraulic-Institute / Takács design equations; stages = TDH ÷ "
-        f"viscosity-corrected head-per-stage. {gl_msg}For the full economic injection "
-        "optimum on a surveyed well, see Optimize → Gas-Lift Optimum.")
+        f"{esp.notes}{cap_note} TDH and brake horsepower per the standard Takács / "
+        "Economides ESP design equations; stages = TDH ÷ viscosity-corrected "
+        "head-per-stage. The viscosity de-rate is a simplified illustrative factor (not "
+        "the full ANSI/HI 9.6.7 chart — it omits the rate correction Cq). "
+        f"{gl_msg}For the full economic injection optimum on a surveyed well, see "
+        "Optimize → Gas-Lift Optimum.")
     theme.source_note(
         "ESP staging via centrifugal-pump affinity laws (Q∝N, H∝N², P∝N³) on TDH; the "
         "plotted pump curve and the green design point share one viscosity head de-rate "

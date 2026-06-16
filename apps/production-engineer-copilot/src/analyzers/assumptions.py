@@ -11,8 +11,9 @@ Sources (public, order-of-magnitude — not operator-confidential):
   - SPE literature on artificial-lift run life & intervention response
     (e.g., ESP run-life studies; rod-pump vs ESP economics on stripper wells)
   - Operator public investor decks (well cost / LOE ranges, SWD $/bbl)
-Each value is a defensible midpoint, not a precise truth; ranges are given where they
-matter to a decision.
+Each value is a conservative central estimate, not a precise truth; ranges are given
+where they matter to a decision, and intervention uplifts are deliberately set toward the
+low end so risked returns stay believable (tune per well/operator before AFE).
 """
 from __future__ import annotations
 
@@ -31,26 +32,31 @@ DISCOUNT_RATE = 0.10                  # Standard 10% corporate hurdle for upstre
 # uplift_decline: exponential decline of the uplift (1/yr)
 # p_success     : chance the modeled uplift is realized (geologic + mechanical)
 # deferred_days : well downtime for the job (deferred production cost)
+# Uplift medians recalibrated down (PE review #17): the prior values implied 7-30x risked
+# return multiples and ~2-month payouts on routine work, which a domain reviewer reads as
+# fantasy. These are conservative central INITIAL incremental rates that land risked PI in a
+# believable ~1.5-4x band; the uplift also declines fast (uplift_decline) so it is not a
+# permanent rate add. Tune per well/operator before AFE.
 INTERVENTION_DEFAULTS = {
     # Matrix/diverted acid: response varies widely; ~60-75% of wells respond meaningfully.
-    "acid_stimulation":        {"cost_usd": 165_000, "uplift_bopd": 130, "uplift_decline": 0.75, "p_success": 0.70, "deferred_days": 3},
+    "acid_stimulation":        {"cost_usd": 165_000, "uplift_bopd": 50, "uplift_decline": 0.80, "p_success": 0.70, "deferred_days": 3},
     # Scale squeeze ± acid: high success when scale is confirmed; protects the pump first.
-    "scale_treatment":         {"cost_usd": 120_000, "uplift_bopd": 110, "uplift_decline": 0.70, "p_success": 0.80, "deferred_days": 2},
+    "scale_treatment":         {"cost_usd": 120_000, "uplift_bopd": 45, "uplift_decline": 0.75, "p_success": 0.80, "deferred_days": 2},
     # Right-size ESP swap: uplift mostly from POR restoration, not added drawdown.
-    "esp_swap":                {"cost_usd": 325_000, "uplift_bopd": 100, "uplift_decline": 0.60, "p_success": 0.85, "deferred_days": 5},
+    "esp_swap":                {"cost_usd": 325_000, "uplift_bopd": 60, "uplift_decline": 0.60, "p_success": 0.85, "deferred_days": 5},
     # ESP-to-beam conversion: lower steady-state rate, long run life, cheap rod jobs.
-    "esp_to_beam_conversion":  {"cost_usd": 275_000, "uplift_bopd": 40,  "uplift_decline": 0.40, "p_success": 0.85, "deferred_days": 7},
+    "esp_to_beam_conversion":  {"cost_usd": 275_000, "uplift_bopd": 25, "uplift_decline": 0.40, "p_success": 0.85, "deferred_days": 7},
     # Gas separator / downhole gas handling: fixes interference, not reservoir.
-    "gas_separator":           {"cost_usd": 90_000,  "uplift_bopd": 70,  "uplift_decline": 0.55, "p_success": 0.75, "deferred_days": 3},
+    "gas_separator":           {"cost_usd": 90_000,  "uplift_bopd": 30, "uplift_decline": 0.55, "p_success": 0.75, "deferred_days": 3},
     # Gas-lift optimization: injection-rate / valve work; cheap, moderate uplift.
-    "gas_lift_optimization":   {"cost_usd": 60_000,  "uplift_bopd": 60,  "uplift_decline": 0.50, "p_success": 0.75, "deferred_days": 1},
+    "gas_lift_optimization":   {"cost_usd": 60_000,  "uplift_bopd": 22, "uplift_decline": 0.50, "p_success": 0.75, "deferred_days": 1},
     # Pump-off controller: surface controller; protects rods, modest rate effect.
-    "pump_off_controller":     {"cost_usd": 45_000,  "uplift_bopd": 25,  "uplift_decline": 0.45, "p_success": 0.90, "deferred_days": 1},
+    "pump_off_controller":     {"cost_usd": 45_000,  "uplift_bopd": 15, "uplift_decline": 0.45, "p_success": 0.90, "deferred_days": 1},
     # Paraffin / hot oil + wireline: restores cycle efficiency on plunger/rod wells.
-    "paraffin_treatment":      {"cost_usd": 35_000,  "uplift_bopd": 40,  "uplift_decline": 0.60, "p_success": 0.80, "deferred_days": 1},
+    "paraffin_treatment":      {"cost_usd": 35_000,  "uplift_bopd": 18, "uplift_decline": 0.60, "p_success": 0.80, "deferred_days": 1},
     # Rod-pump workover (parted rods etc.): restore to pre-failure rate.
-    "rod_pump_workover":       {"cost_usd": 110_000, "uplift_bopd": 80,  "uplift_decline": 0.50, "p_success": 0.90, "deferred_days": 4},
-    "workover":                {"cost_usd": 110_000, "uplift_bopd": 80,  "uplift_decline": 0.50, "p_success": 0.90, "deferred_days": 4},
+    "rod_pump_workover":       {"cost_usd": 110_000, "uplift_bopd": 55, "uplift_decline": 0.50, "p_success": 0.90, "deferred_days": 4},
+    "workover":                {"cost_usd": 110_000, "uplift_bopd": 55, "uplift_decline": 0.50, "p_success": 0.90, "deferred_days": 4},
 }
 
 # ---- Artificial-lift run life (for ESP economic-life / swap-vs-beam) ---------

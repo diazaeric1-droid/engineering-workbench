@@ -170,4 +170,10 @@ def signal_capture(model_auroc: float, ceiling_auroc: float) -> dict:
     ratio = model_auroc / ceiling_auroc if ceiling_auroc else float("nan")
     denom = ceiling_auroc - 0.5
     above = (model_auroc - 0.5) / denom if denom > 0 else float("nan")
-    return {"ratio": float(ratio), "above_chance": float(above)}
+    # A model cannot capture MORE than the attainable ceiling. On few positives the
+    # estimate can land a hair above it (sampling noise); clamp so we never display a
+    # >100% capture (and flag that the model is at/above the ceiling within noise).
+    at_or_above = bool(np.isfinite(above) and above >= 1.0)
+    ratio = float(min(ratio, 1.0)) if np.isfinite(ratio) else float("nan")
+    above = float(min(above, 1.0)) if np.isfinite(above) else float("nan")
+    return {"ratio": ratio, "above_chance": above, "at_or_above_ceiling": at_or_above}

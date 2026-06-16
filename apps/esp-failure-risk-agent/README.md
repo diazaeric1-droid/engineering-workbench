@@ -89,20 +89,20 @@ Data and the trained artifact aren't committed (they're `.gitignore`d) — the a
 
 | Metric | Value | Oracle ceiling | What it means |
 |---|---|---|---|
-| AUROC (OOF CV, mean ± std) | **≈ 0.85 ± 0.17** | **0.85** | ranking quality on overlapping, noisy classes |
+| AUROC — pooled OOF *(mean-of-folds)* | **≈ 0.81** *(0.85 ± 0.17)* | **0.853** | ranking quality vs the Bayes ceiling, compared pooled-to-pooled |
 | Precision @ top-10% | **≈ 0.90** | 1.00 | of the 10 wells you'd work this week, ~9 really fail |
 | Recall @ top-10% | **≈ 0.53** | — | fraction of all failures caught in that top-10% alert list |
 | Brier score (OOF) | **≈ 0.10** | 0.05 | probability calibration (lower is better) |
 
 The synthetic generator deliberately varies failure onset/severity, adds sub-threshold degradation to ~25% of healthy wells, and injects ~5% label noise, so the classes genuinely overlap — **treat any near-1.0 AUROC as a red flag, not a win.** Regenerate any time with `python data/synthetic/generate.py && python -m src.train`.
 
-### Is ~0.85 AUROC "good"? — the oracle ceiling
+### Is that AUROC "good"? — the oracle ceiling
 
 Because the synthetic labels come from a **known** process, there's an information-theoretic ceiling on *any* model. The generator flips ~5% of labels at random (surprise failures / mislabels), and that flip is **independent of the features**, so no model can recover it. The Bayes-optimal ("oracle") predictor scores each well by its true-class probability `P(observed=1 | true class)`; grading those probabilities against the same noisy labels gives the attainable ceiling (`src/oracle.py`, surfaced in `artifacts/training_report.json` and the app's 📐 *Oracle Ceiling* panel):
 
-> **Model OOF AUROC ≈ 0.85 vs oracle ceiling ≈ 0.85 → the model captures ~100% of the attainable above-chance signal.**
+> **Compared apples-to-apples (pooled out-of-fold, the same way the ceiling is computed): model pooled OOF AUROC ≈ 0.81 vs oracle ceiling 0.853 → the model recovers ~89% of the attainable above-chance signal** — statistically indistinguishable from the noise-floor ceiling given only ~17 positive events (mean-of-folds 0.85 ± 0.17; don't over-read the third decimal).
 
-In other words, the realistic ~0.85 is the model sitting essentially **at the noise floor**, not below some ideal — the ~0.15 of "missing" AUROC is irreducible label noise, not a model defect. (This seed flips 5 healthy wells to "failed"; their features look healthy, so even a perfect ranker can't lift them above the truly-degrading wells.) The training run prints model-vs-ceiling and writes `oracle_ceiling` + `signal_capture` to the report so CI can assert the model stays near the ceiling rather than chasing an arbitrary AUROC floor.
+In other words, the realistic model sits **within sampling noise of the noise-floor ceiling**, not below some ideal — most of the ~0.19 of "missing" AUROC (1.0 − 0.81) is irreducible label noise, not a model defect. `signal_capture` clamps the reported capture to ≤100% and sets an `at_or_above_ceiling` flag rather than ever claiming a model beats the ceiling. (This seed shows 17 observed positives across 100 wells — 12 true failures plus 5 feature-independent label flips; the flipped wells look healthy, so even a perfect ranker can't lift them above the truly-degrading wells.) The training run prints model-vs-ceiling and writes `oracle_ceiling` + `signal_capture` to the report so CI can assert the model stays near the ceiling rather than chasing an arbitrary AUROC floor.
 
 ### Survival / time-to-failure (a real trained model, not a projection)
 

@@ -216,8 +216,10 @@ CITATIONS = {
     "esp_affinity": "ESP sizing via centrifugal-pump affinity laws (Q ∝ N, H ∝ N², P ∝ N³) "
                     "and total-dynamic-head staging. See Takács, G. (2017), “Electrical "
                     "Submersible Pumps Manual,” 2nd ed., Gulf Professional.",
-    "pvt": "PVT (black-oil) correlations for Bo, Rs, μ, Z. See Standing (1947), Vázquez & "
-           "Beggs (1980), and McCain, “The Properties of Petroleum Fluids” (1990).",
+    "pvt": "PVT (black-oil) correlations: Bo / Rs / bubble point — Standing (1947); oil "
+           "viscosity — Beggs & Robinson (1975); gas z-factor — Dranchuk & Abou-Kassem "
+           "(1975) with Sutton pseudo-criticals; water — McCain, “The Properties of "
+           "Petroleum Fluids” (1990); see also Vázquez & Beggs (1980).",
     "bluebonnet": "PVT, scaling-solution production curves, and rate-transient analysis via "
                   "bluebonnet (F. Male et al.; open-source, BSD-licensed).",
     "milp": "Capital selection as a 0/1 mixed-integer linear program (maximize risked NPV "

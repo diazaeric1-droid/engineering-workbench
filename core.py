@@ -61,10 +61,10 @@ APP_DIRS = {
 # Absorbed component versions (see VENDORING.md). pec's pyproject is the source of
 # truth for its version (its src/__init__ lags at 0.9.0).
 COMPONENT_VERSIONS = {
-    "well-performance-studio": "0.2.3",  # lift.py: visc-corrected pump curve, freq-scaled
-    "production-engineer-copilot": "0.9.2",  # runout, stage cap, gas-lift econ/rollover
-    "esp-failure-risk-agent": "0.7.3",
-    "well-gas-lift-advisor": "0.1.0",
+    "well-performance-studio": "0.2.4",  # lift: BEP-window + inflow-limited gates; PVT labels
+    "production-engineer-copilot": "0.9.3",  # MC chance-of-success; recalibrated uplift defaults
+    "esp-failure-risk-agent": "0.7.4",  # pooled-OOF AUROC; capture clamped <=100%
+    "well-gas-lift-advisor": "0.2.0",  # fleet regen to realistic Mscf/d; lift-gas-margin labels
 }
 
 
@@ -237,6 +237,7 @@ def ensure_esp_model(log=print) -> Path:
     ESP_TRAINING_REPORT.write_text(json.dumps({
         "auroc_cv_mean": result.auroc_cv_mean,
         "auroc_cv_std": result.auroc_cv_std,
+        "auroc_oof_pooled": result.auroc_oof_pooled,
         "precision_at_top10pct": result.precision_at_top10pct,
         "recall_at_top10pct": result.recall_at_top10pct,
         "brier": result.brier,
@@ -622,6 +623,12 @@ class WellDesignSeed:
     esp_frequency_hz: float | None
     esp_intake_psi: float | None
     provenance: dict = _dc_field(default_factory=dict)
+    # raw (uncapped) Standing Pb and whether it was clamped to reservoir pressure. When
+    # the produced-GOR Standing Pb lands above the formation-typical reservoir pressure the
+    # well is modeled fully saturated and bubble_point_psia is pinned to Pres; these fields
+    # let the Design views disclose that instead of showing Pb == Pres as a "derived" value.
+    bubble_point_raw_psia: float = 0.0
+    bubble_point_clamped: bool = False
 
 
 def well_design_seed(well_id: str) -> WellDesignSeed:
@@ -700,9 +707,16 @@ def well_design_seed(well_id: str) -> WellDesignSeed:
     temp_surface_f = 100.0; prov["temp_surface_f"] = "assumed"
     temp_bottom_f = float(70.0 + 0.013 * depth_ft)  # ~1.3 degF/100 ft geothermal
     prov["temp_bottom_f"] = "derived"
-    bubble_point_psia = _standing_bubble_point(gor, gas_sg, oil_api, temp_bottom_f)
-    bubble_point_psia = float(min(max(bubble_point_psia, 200.0), reservoir_pressure_psia))
-    prov["bubble_point_psia"] = "derived"
+    # NOTE: `gor` here is the well's *produced* (total) GOR used as a proxy for solution
+    # Rs. For high-GOR wells the produced GOR overstates Rs, so the Standing Pb below often
+    # lands above the formation-typical reservoir pressure; when it does we clamp Pb to Pres
+    # and flag it (the clamped value is the assumed Pres, not a correlation output).
+    bubble_point_raw = _standing_bubble_point(gor, gas_sg, oil_api, temp_bottom_f)
+    bubble_point_clamped = bool(bubble_point_raw > reservoir_pressure_psia)
+    bubble_point_psia = float(min(max(bubble_point_raw, 200.0), reservoir_pressure_psia))
+    bubble_point_raw_psia = float(max(bubble_point_raw, 200.0))
+    # Honest provenance: a clamped Pb is the assumed reservoir pressure, not a derived value.
+    prov["bubble_point_psia"] = "assumed" if bubble_point_clamped else "derived"
     try:
         # Evaluate at the bubble point: _live_oil_visc is the SATURATED correlation (it
         # dissolves Rs at the pressure passed in). At reservoir pressure (p > Pb) it would
@@ -767,4 +781,6 @@ def well_design_seed(well_id: str) -> WellDesignSeed:
         current_gas_mcfd=float(gas_mcfd),
         esp_frequency_hz=esp_freq, esp_intake_psi=esp_intake,
         provenance=prov,
+        bubble_point_raw_psia=bubble_point_raw_psia,
+        bubble_point_clamped=bubble_point_clamped,
     )

@@ -219,6 +219,7 @@ def simulate_intervention(
     realized_price_per_bbl: float = 65.0,
     discount_rate: float = 0.10,
     opex_per_bbl: float = 12.0,
+    prob_success: float = 1.0,
     n_trials: int = 10_000,
     rate_cv: float = 0.30,
     decline_abs_sd: float = 0.15,
@@ -233,11 +234,17 @@ def simulate_intervention(
                                 (can't go negative, right-skewed like real uplift).
       - uplift_decline_per_yr : normal, sd = decline_abs_sd (0.15 absolute), clipped >= 0.
       - realized_price_per_bbl: normal, sd = price_sd ($12), clipped to a sane floor.
+      - prob_success          : geological/mechanical chance the job works at all. Each
+                                trial draws Bernoulli(prob_success); on a MISS the uplift
+                                is zero and the NPV is the sunk treatment cost (-cost) — the
+                                same dry-hole framing evaluate_intervention's risked_npv
+                                uses. Default 1.0 keeps the bare input-uncertainty view and
+                                preserves backward-compatible (rng-identical) behaviour.
 
     Returns P10/P50/P90 NPV, probability_of_payout (NPV>0 AND payout < cutoff),
-    and a one-at-a-time tornado dict (low/high NPV swing per variable, others held
-    at their point estimate). P-naming follows reserves convention: P10 = optimistic
-    (high) NPV, P90 = conservative (low) NPV.
+    probability_of_loss, and a one-at-a-time tornado dict (low/high NPV swing per variable,
+    others held at their point estimate). P-naming follows reserves convention: P10 =
+    optimistic (high) NPV, P90 = conservative (low) NPV.
     """
     rng = np.random.default_rng(seed)
 
@@ -259,8 +266,19 @@ def simulate_intervention(
         horizon_years=horizon_years, discount_rate=discount_rate, opex_per_bbl=opex_per_bbl,
     )
 
+    # Chance-of-success: on a geological/mechanical MISS the job delivers no uplift and the
+    # capital is sunk, so NPV = -treatment_cost and there is no payout. Drawn AFTER the
+    # continuous inputs so that prob_success == 1.0 leaves the rng stream (and every output)
+    # bit-for-bit identical to the pre-COS behaviour. (PE review #18/#16)
+    p_succ = float(min(max(prob_success, 0.0), 1.0))
+    if p_succ < 1.0:
+        success = rng.random(n_trials) < p_succ
+        npv = np.where(success, npv, -float(treatment_cost_usd))
+        payout = np.where(success, payout, np.inf)
+
     p90, p50, p10 = (float(x) for x in np.percentile(npv, [10, 50, 90]))  # P90=low, P10=high
     prob_payout = float(np.mean((npv > 0) & (payout < payout_cutoff_months)))
+    prob_loss = float(np.mean(npv < 0.0))
 
     # ---- tornado: one-at-a-time low/high, others at point estimate -------------
     def _scalar_npv(rate, decline, price):
@@ -308,11 +326,14 @@ def simulate_intervention(
         "npv_mean_usd": float(np.mean(npv)),
         "npv_samples": npv,  # raw per-trial NPV draws (for plotting the MC distribution)
         "probability_of_payout": prob_payout,  # NPV>0 AND payout < cutoff
+        "probability_of_loss": prob_loss,      # NPV < 0 (incl. chance-of-success misses)
+        "prob_success": p_succ,
         "payout_cutoff_months": float(payout_cutoff_months),
         "tornado": tornado,
         "assumptions": {
             "rate_cv": rate_cv,
             "decline_abs_sd": decline_abs_sd,
             "price_sd": price_sd,
+            "prob_success": p_succ,
         },
     }

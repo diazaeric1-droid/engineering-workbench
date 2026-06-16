@@ -63,10 +63,14 @@ def main():
     for n in range(1, N_WELLS + 1):
         well_id = f"well_{n:03d}"
 
-        # GLPC parameters
+        # GLPC parameters. The efficiency coefficient `a` is the exp rate-constant in
+        # q_liq = q_sl + (q_max-q_sl)(1-exp(-a*Qinj)); it sets the injection SCALE at which
+        # the curve saturates. a ~ 0.001-0.004 /Mscfd makes the GLPC saturate over hundreds
+        # of Mscf/d → physically defensible Permian lift-gas volumes (true_opt ~200-2000
+        # Mscf/d), instead of the single-digit Mscf/d the old a~0.7-2.8 produced (PE #13).
         q_sl = float(rng.uniform(120, 380))
         q_max = q_sl * float(rng.uniform(1.6, 3.2))
-        a = float(rng.uniform(0.7, 2.8))
+        a = float(rng.uniform(0.001, 0.004))
         water_cut = float(rng.uniform(0.28, 0.68))
         opt_inj = _true_opt(q_sl, q_max, a, water_cut)
 
@@ -75,23 +79,26 @@ def main():
             bias = rng.uniform(1.12, 1.55)   # over-injected
         else:
             bias = rng.uniform(0.50, 0.90)   # under-injected
-        q_inj_current = max(0.10, opt_inj * bias if opt_inj > 0.05 else rng.uniform(0.2, 1.5))
+        q_inj_current = max(10.0, opt_inj * bias if opt_inj > 5.0 else rng.uniform(50, 400))
 
-        # Injection rate array (120 days)
+        # Injection rate array (120 days). Noise is ~1% of the level (matching the old
+        # signal-to-noise ratio at the new scale) so GLPC identifiability is preserved.
         # Pre-survey: at current rate (± small daily noise)
-        pre = np.full(PRE_DAYS, q_inj_current) + rng.normal(0, 0.05, PRE_DAYS)
+        pre = np.full(PRE_DAYS, q_inj_current) + rng.normal(0, max(0.01 * q_inj_current, 0.5), PRE_DAYS)
 
-        # Survey: log-spaced from near-zero to 2.2× optimum so the rising portion
-        # of the GLPC (where 'a' is identifiable) gets denser coverage.
-        survey_max = max(opt_inj * 2.2, 1.5)
+        # Survey: log-spaced over the same RELATIVE range as before (~1% of opt → 2.2× opt)
+        # so the rising portion of the GLPC (where 'a' is identifiable) keeps dense coverage
+        # at the new scale.
+        survey_max = max(opt_inj * 2.2, 50.0)
+        survey_lo = max(opt_inj * 0.01, 1.0)
         survey_levels = np.exp(
-            np.linspace(np.log(0.05), np.log(survey_max), SURVEY_LEVELS)
+            np.linspace(np.log(survey_lo), np.log(survey_max), SURVEY_LEVELS)
         )
         survey = np.repeat(survey_levels, DAYS_PER_LEVEL)
-        survey += rng.normal(0, 0.02, len(survey))
+        survey = survey * rng.normal(1.0, 0.01, len(survey))
 
         # Post-survey: back at current rate
-        post = np.full(POST_DAYS, q_inj_current) + rng.normal(0, 0.05, POST_DAYS)
+        post = np.full(POST_DAYS, q_inj_current) + rng.normal(0, max(0.01 * q_inj_current, 0.5), POST_DAYS)
 
         q_inj = np.concatenate([pre, survey, post])
         q_inj = np.maximum(0.02, q_inj)

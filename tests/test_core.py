@@ -61,6 +61,26 @@ def test_esp_oracle_generator_module_pinned_to_esp_copy():
     assert gen.N_WELLS == 100  # the ESP generator's fleet size
 
 
+# ---------------------------------------------------------------- oracle honesty (#20)
+def test_oracle_signal_capture_clamped_and_pooled():
+    """PE review #20: the report must carry a POOLED OOF AUROC (ceiling-comparable), and
+    signal_capture must never report >100% — a model can't beat its own attainable ceiling.
+    Guards against the prior 'captures ~100% / AUROC 0.854 above ceiling 0.853' overclaim."""
+    import json
+    rep = json.loads(core.ESP_TRAINING_REPORT.read_text())
+    assert "auroc_oof_pooled" in rep, "report must carry the pooled OOF AUROC"
+    assert 0.5 < rep["auroc_oof_pooled"] <= 1.0
+    # pooled OOF should not sit above the pooled ceiling (apples-to-apples)
+    labels = core.esp_loader.load_labels(
+        core.ESP_DATA / "labels.csv").set_index("well_id")["failed_within_30d"]
+    ceiling = core.esp_oracle.compute_oracle_ceiling(labels)
+    assert rep["auroc_oof_pooled"] <= ceiling.auroc + 0.02
+    # a model AUROC numerically above the ceiling must clamp, not report >100%
+    cap = core.esp_oracle.signal_capture(0.999, ceiling.auroc)
+    assert cap["ratio"] <= 1.0 and cap["above_chance"] <= 1.0
+    assert cap["at_or_above_ceiling"] is True
+
+
 # ---------------------------------------------------------------- bootstrap
 def test_bootstrap_produces_expected_files():
     assert core.ESP_MODEL.exists(), "trained ESP model artifact"
@@ -225,7 +245,17 @@ def test_design_seed_anchors_to_well_with_honest_provenance():
     # provenance is honest about what came from the well vs an assumption
     assert a.provenance["water_cut_frac"] == "measured"
     assert a.provenance["reservoir_pressure_psia"] == "assumed"
-    assert a.provenance["bubble_point_psia"] == "derived"
+    # Bubble point: 'derived' (Standing) only while it sits below reservoir pressure; when
+    # the produced-GOR Standing Pb exceeds Pres we clamp it and must NOT keep calling the
+    # clamped value 'derived' — it is then the assumed reservoir pressure. (#21)
+    for s in (a, b):
+        if s.bubble_point_clamped:
+            assert s.provenance["bubble_point_psia"] == "assumed"
+            assert s.bubble_point_psia == pytest.approx(s.reservoir_pressure_psia)
+            assert s.bubble_point_raw_psia >= s.reservoir_pressure_psia
+        else:
+            assert s.provenance["bubble_point_psia"] == "derived"
+            assert s.bubble_point_psia <= s.reservoir_pressure_psia + 1e-6
 
 
 def test_design_seed_real_and_scada_only_wells_do_not_crash():
@@ -251,6 +281,27 @@ def test_design_seed_never_fabricates_measured_provenance_on_shut_in_tail():
             assert s.provenance["water_cut_frac"] == "assumed"
 
 
+def test_design_seed_clamped_bubble_point_is_not_labeled_derived():
+    """Regression (#21): when the produced-GOR Standing Pb exceeds reservoir pressure the
+    seed clamps Pb to Pres. The clamped value is the ASSUMED reservoir pressure, so it must
+    never be presented as a 'derived' correlation result. At least one synthetic well trips
+    the clamp; every clamped well must carry the honest provenance + the raw Standing Pb."""
+    clamped = 0
+    for wid in [f"well_{i:03d}" for i in range(1, 60)]:
+        try:
+            s = core.well_design_seed(wid)
+        except Exception:  # noqa: BLE001 — non-existent id in this fleet
+            continue
+        if s.bubble_point_clamped:
+            clamped += 1
+            assert s.provenance["bubble_point_psia"] == "assumed"
+            assert s.bubble_point_psia == pytest.approx(s.reservoir_pressure_psia)
+            assert s.bubble_point_raw_psia > s.reservoir_pressure_psia
+        else:
+            assert s.provenance["bubble_point_psia"] == "derived"
+    assert clamped > 0, "expected at least one well with a clamped (saturated) bubble point"
+
+
 # ---------------------------------------------------------------- lift physics (v0.3.0)
 def test_lift_design_feasible_flag_and_runout_scaling():
     """ESP design must (a) expose viscosity factors + a frequency-scaled runout, and
@@ -271,6 +322,25 @@ def test_lift_design_feasible_flag_and_runout_scaling():
     ok = core.wps_lift.design_esp(ipr, vlp, target_q_stb_d=900.0, frequency_hz=60.0,
                                   fluid_viscosity_cp=50.0)
     assert 0.0 < ok.head_visc_factor <= 1.0 and 0.0 < ok.eff_visc_factor <= 1.0
+
+
+def test_lift_design_flags_inflow_limited_and_bep_window():
+    """PE review #8/#6: a target at/above the reservoir AOF is INFLOW-limited (distinct
+    from a runout/lift limit) and must not emit a stage count off a clamped pwf=0 inflow;
+    and the design must expose a BEP operating-window ratio so an out-of-window (e.g.
+    severe downthrust) design is flagged rather than passing as a bare 'meets target'."""
+    ipr = core.wps_nodal.vogel_ipr(p_res=3000.0, pb=3000.0, q_test=600.0, pwf_test=2200.0)
+    vlp = core.wps_nodal.VLPInputs(water_cut=0.4, glr_scf_stb=300.0)
+    aof = float(ipr.aof)
+    lim = core.wps_lift.design_esp(ipr, vlp, target_q_stb_d=aof, frequency_hz=60.0)
+    assert lim.inflow_limited is True
+    assert lim.meets_target is False
+    assert lim.aof_stb_d == pytest.approx(aof, rel=1e-6)
+    # a small target is not inflow-limited but sits well below the BEP window (downthrust)
+    low = core.wps_lift.design_esp(ipr, vlp, target_q_stb_d=0.25 * aof, frequency_hz=60.0)
+    assert low.inflow_limited is False
+    assert low.q_bep_at_freq_bpd > 0 and low.bep_ratio > 0
+    assert low.bep_ratio < 0.70 and low.bep_ok is False
 
 
 def test_gas_lift_sweep_economics_and_rollover_flags():
@@ -304,6 +374,21 @@ def test_simulate_intervention_ordered_deterministic_with_tornado():
                                   "realized_price_per_bbl"}
     assert all(t["swing"] >= 0 for t in s1["tornado"].values())
     assert s1["npv_p50_usd"] == s2["npv_p50_usd"]  # deterministic on the seed
+    # default prob_success=1.0 leaves the rng stream identical (no COS draw) — backward compat
+    assert s1.get("probability_of_loss", 0.0) >= 0.0
+
+    # chance-of-success path (PE review #18): a miss books -cost, so P(loss) >= the miss
+    # rate and P(payout) drops below the all-success case.
+    risky = core.pec_economics.simulate_intervention(prob_success=0.70, **kw)
+    assert risky["prob_success"] == pytest.approx(0.70)
+    assert risky["probability_of_loss"] >= 0.25  # ~30% miss mass at -cost (plus economic misses)
+    assert risky["probability_of_payout"] <= s1["probability_of_payout"]
+    # the risked deterministic NPV should sit within the MC P90..P10 band (reconciliation #16)
+    det = core.pec_economics.evaluate_intervention(
+        name="acid_stimulation", treatment_cost_usd=d["cost_usd"],
+        incremental_rate_bopd=d["uplift_bopd"], uplift_decline_per_yr=d["uplift_decline"],
+        realized_price_per_bbl=70.0, discount_rate=0.10, opex_per_bbl=12.0, prob_success=0.70)
+    assert risky["npv_p90_usd"] <= det.npv_10pct_usd <= risky["npv_p10_usd"]
 
 
 # ---------------------------------------------------------------- survival metrics pin

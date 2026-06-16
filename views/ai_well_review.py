@@ -29,28 +29,36 @@ def _usd(x: float) -> str:
 
 
 def _probabilistic_econ_panel(row) -> None:
-    """Keyless Monte-Carlo economics for the indicated intervention — P10/P50/P90 NPV, a
-    payout probability, the NPV distribution, and a tornado of the input swings. Uses the
-    SAME calibrated assumptions (cost / uplift / decline) the point estimate above used, so
-    the probabilistic view is consistent with the headline number — it just adds the
-    uncertainty bands a PE expects before committing capital. (core.pec_economics)."""
+    """Keyless Monte-Carlo economics for the indicated intervention — P10/P50/P90 NPV, the
+    payout/loss probabilities, the NPV distribution, and a tornado of the input swings. The
+    MC is RISKED by chance-of-success (Bernoulli per trial → NPV = −cost on a miss), uses the
+    realized (differential-adjusted) price the headline uses, and the deterministic risked
+    NPV is overlaid so the base case visibly sits inside the bands. (core.pec_economics)."""
     defaults = core.pec_assumptions.intervention_defaults(row.intervention)
     if not defaults:
         return
     oil_price, nri, discount = _common.deck()
+    # ONE realized price for both paths: the deck is WTI; apply the basis/quality
+    # differential once so the MC and the deterministic headline cannot diverge (#19).
+    realized = float(oil_price) + float(core.pec_assumptions.REALIZED_DIFFERENTIAL)
+    opex = float(core.pec_assumptions.LOE_USD_PER_BBL)
+    p_succ = float(defaults.get("p_success", 1.0))
+    common = dict(
+        name=row.intervention, treatment_cost_usd=defaults["cost_usd"],
+        incremental_rate_bopd=defaults["uplift_bopd"],
+        uplift_decline_per_yr=defaults["uplift_decline"],
+        realized_price_per_bbl=realized, discount_rate=discount, opex_per_bbl=opex)
     try:
-        sim = core.pec_economics.simulate_intervention(
-            name=row.intervention, treatment_cost_usd=defaults["cost_usd"],
-            incremental_rate_bopd=defaults["uplift_bopd"],
-            uplift_decline_per_yr=defaults["uplift_decline"],
-            realized_price_per_bbl=oil_price, discount_rate=discount,
-            opex_per_bbl=float(core.pec_assumptions.LOE_USD_PER_BBL), seed=42)
+        sim = core.pec_economics.simulate_intervention(prob_success=p_succ, seed=42, **common)
+        det = core.pec_economics.evaluate_intervention(prob_success=p_succ, **common)
     except Exception:  # noqa: BLE001
         return
+    det_npv = float(det.npv_10pct_usd)
 
     pt.section("Probabilistic Intervention Economics (Monte-Carlo)",
                "10,000 trials over uncertain incremental rate (±lognormal), uplift decline, "
-               "and realized price — the same calibrated cost/uplift the point estimate used.")
+               f"and realized price, RISKED by the {p_succ:.0%} chance-of-success — same "
+               "calibrated cost/uplift/price the risked point estimate above uses.")
     pt.kpi_row([
         {"label": "NPV P90", "value": _usd(sim["npv_p90_usd"]),
          "help": "Conservative — 90% chance of exceeding"},
@@ -59,6 +67,9 @@ def _probabilistic_econ_panel(row) -> None:
          "help": "Optimistic — 10% chance of exceeding"},
         {"label": "P(payout)", "value": f"{sim['probability_of_payout']:.0%}",
          "help": f"NPV>0 AND payout < {sim['payout_cutoff_months']:.0f} months"},
+        {"label": "P(loss)", "value": f"{sim.get('probability_of_loss', 0.0):.0%}",
+         "help": f"NPV<0, including the {1 - p_succ:.0%} chance the job simply misses "
+                 "(geologic/mechanical) and the capital is sunk."},
     ])
 
     cL, cR = st.columns(2)
@@ -67,10 +78,10 @@ def _probabilistic_econ_panel(row) -> None:
         hfig = go.Figure(go.Histogram(x=samples, nbinsx=40, marker_color=theme.BLUE,
                                       opacity=0.85))
         hfig.add_vline(x=0, line=dict(color=theme.RED, width=1, dash="dot"))
-        hfig.add_vline(x=sim["npv_p50_usd"] / 1e6,
+        hfig.add_vline(x=det_npv / 1e6,
                        line=dict(color=theme.GREEN, width=2, dash="dash"),
-                       annotation_text="P50", annotation_position="top")
-        hfig.update_layout(title="NPV Distribution (10k trials)",
+                       annotation_text="Risked NPV (det.)", annotation_position="top")
+        hfig.update_layout(title="NPV Distribution (10k trials, COS-risked)",
                            xaxis_title="NPV ($MM)", yaxis_title="Trials", showlegend=False)
         st.plotly_chart(theme.style_fig(hfig, height=300, legend=False), width="stretch")
     with cR:
@@ -86,19 +97,21 @@ def _probabilistic_econ_panel(row) -> None:
                 y=[labels.get(var, var)], x=[right - left], base=[left], orientation="h",
                 marker_color=theme.AMBER, showlegend=False,
                 hovertemplate=f"{labels.get(var, var)}: {left:.2f}–{right:.2f} $MM<extra></extra>"))
-        tfig.add_vline(x=sim["npv_p50_usd"] / 1e6,
+        tfig.add_vline(x=det_npv / 1e6,
                        line=dict(color=theme.GREEN, width=2, dash="dash"))
-        tfig.update_layout(title="Tornado — NPV Swing By Input", xaxis_title="NPV ($MM)",
-                           yaxis_title=None, bargap=0.35)
+        tfig.update_layout(title="Tornado — NPV Swing By Input (success case)",
+                           xaxis_title="NPV ($MM)", yaxis_title=None, bargap=0.35)
         st.plotly_chart(theme.style_fig(tfig, height=300, legend=False), width="stretch")
 
     st.caption(
         f"Cost ${defaults['cost_usd']/1e3:,.0f}k · uplift {defaults['uplift_bopd']:.0f} BOPD "
-        f"@ {defaults['uplift_decline']:.0%}/yr decline · ${oil_price:,.0f}/bbl, "
-        f"{discount:.0%} discount, ${core.pec_assumptions.LOE_USD_PER_BBL:,.0f}/bbl LOE. "
-        "This is the input-uncertainty distribution of the intervention NPV — distinct from "
-        "the chance-of-success-**risked** point NPV above (which scales by P(success)). "
-        "Deterministic Monte-Carlo (seed 42); no LLM, no API key.")
+        f"@ {defaults['uplift_decline']:.0%}/yr decline · ${realized:,.0f}/bbl realized "
+        f"(${oil_price:,.0f} WTI {core.pec_assumptions.REALIZED_DIFFERENTIAL:+.0f} basis) · "
+        f"{discount:.0%} discount · ${opex:,.0f}/bbl LOE · {p_succ:.0%} chance-of-success. "
+        f"Each trial draws Bernoulli({p_succ:.2f}); a miss zeros the uplift and books −cost, "
+        "so P(payout)/P(loss) are honest and the distribution is consistent with the risked "
+        "point NPV (green line = deterministic risked NPV; the green spike at −cost is the "
+        "miss mass). Tornado spans the success-case input swings. Seed 42; no LLM, no key.")
 
 
 def _holdout_agreement() -> float:

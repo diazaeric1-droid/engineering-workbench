@@ -125,9 +125,14 @@ def net_revenue_daily(
     gas_cost_per_mscf: float,
     nri: float,
 ) -> np.ndarray:
-    """Net revenue per day at each injection rate [$/day].
+    """Oil revenue net of injection-gas cost, per day, at each injection rate [$/day].
 
-    net_revenue = q_oil × oil_price × nri − Qinj × gas_cost
+    objective = q_oil × oil_price × nri − Qinj × gas_cost
+
+    NOTE: this is the lift-gas margin used to LOCATE the injection optimum (its derivative
+    sets dNet/dQinj = 0). It is NOT a full net revenue — it deliberately omits LOE,
+    compression opex, and water-disposal cost, which are ~fixed per bbl and do not move the
+    injection optimum. Do not present the level as "net revenue" without that caveat.
     """
     q = np.asarray(q_inj, dtype=float)
     q_oil = glpc_rate(q, params) * (1.0 - water_cut)

@@ -4,7 +4,8 @@ Builds a black-oil + gas PVT property table from a handful of field-known inputs
 (oil API, gas SG, solution GOR, reservoir temperature) using bluebonnet's published
 correlations:
 
-* oil FVF / viscosity — Standing
+* oil FVF / Rs / bubble point — Standing
+* oil viscosity — Beggs-Robinson
 * gas FVF / viscosity / z-factor / compressibility — Dranchuk & Abou-Kassem (1975),
   Sutton pseudo-criticals
 * water FVF / viscosity — McCain-family correlations
@@ -75,7 +76,7 @@ def pvt_table(inp: PVTInputs) -> pd.DataFrame:
     """Return a PVT property table (one row per pressure step).
 
     Columns: ``pressure`` (psia), ``Bo`` (rb/stb), ``oil_viscosity`` (cP),
-    ``Bg`` (rcf/scf), ``gas_viscosity`` (cP), ``z_factor`` (-),
+    ``Bg`` (rb/scf), ``gas_viscosity`` (cP), ``z_factor`` (-),
     ``Bw`` (rb/stb), ``water_viscosity`` (cP).
     """
     fluid = make_fluid(inp)

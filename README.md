@@ -52,10 +52,13 @@ The honest numbers travel with the components:
   published values (e.g. the Vogel worked example AOF = 1095.5 STB/d, asserted
   through the `wps` alias in this repo's tests).
 - **Oracle ceiling** — the ESP generator injects ~5% feature-independent label
-  noise, so a Bayes-optimal ceiling exists: model OOF AUROC **0.854** vs
-  computed ceiling **0.853** ⇒ the model captures ~**100% of attainable
-  signal** (it sits at the noise floor, not below an ideal). Reproduced from
-  scratch by `core.bootstrap()` on every fresh clone.
+  noise, so a Bayes-optimal ceiling exists. Compared apples-to-apples (pooled
+  out-of-fold, the same way the ceiling is computed): model **pooled OOF AUROC
+  ≈ 0.81** vs ceiling **0.853** ⇒ the model recovers ~**89% of the attainable
+  above-chance signal** — statistically indistinguishable from the noise-floor
+  ceiling given only ~17 positive events (mean-of-folds 0.85 ± 0.17; don't
+  over-read the third decimal). Reproduced from scratch by `core.bootstrap()`
+  on every fresh clone.
 - **Honest eval** — the AI Well Review reports the **blind-holdout 0.722**
   recommendation agreement under strict exact-class grading (18 held-out
   cases), read from the committed eval artifact.

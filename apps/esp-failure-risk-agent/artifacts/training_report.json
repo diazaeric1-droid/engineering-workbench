@@ -1,6 +1,7 @@
 {
   "auroc_cv_mean": 0.8537990196078432,
   "auroc_cv_std": 0.16664846353881038,
+  "auroc_oof_pooled": 0.8143160878809356,
   "precision_at_top10pct": 0.9,
   "recall_at_top10pct": 0.5294117647058824,
   "brier": 0.09656265950111054,

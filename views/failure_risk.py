@@ -207,7 +207,10 @@ def render() -> None:
     oc = _common.oracle_cached()
     if oc and oc.get("ceiling"):
         c = oc["ceiling"]
-        m_auroc = oc.get("model_auroc")
+        m_auroc = oc.get("model_auroc")            # pooled OOF AUROC (ceiling-comparable)
+        cv_mean = oc.get("auroc_cv_mean")          # mean-of-folds (flattering, single seed)
+        cv_std = oc.get("auroc_cv_std")
+        n_pos = oc.get("n_positives") or c.get("n_observed_positives")
         cap = oc.get("capture")
         pt.section("Oracle Ceiling — Is ~0.85 AUROC Good?",
                    "The generator injects ~5% feature-independent label noise, so "
@@ -216,15 +219,21 @@ def render() -> None:
         k1, k2, k3 = st.columns(3)
         with k1:
             if m_auroc is not None:
-                st.metric("Model OOF AUROC", f"{m_auroc:.3f}",
-                          delta=f"ceiling {c['auroc']:.3f}", delta_color="off")
+                st.metric("Model OOF AUROC (pooled)", f"{m_auroc:.3f}",
+                          delta=f"ceiling {c['auroc']:.3f}", delta_color="off",
+                          help="Pooled out-of-fold AUROC over all wells — the same way "
+                               "the ceiling is computed (apples-to-apples). The "
+                               f"mean-of-folds is {cv_mean:.3f} ± {cv_std:.3f} on only "
+                               f"{n_pos} positive events, so treat 3-decimal precision "
+                               "with care." if cv_mean is not None else None)
             else:
                 st.metric("Oracle AUROC Ceiling", f"{c['auroc']:.3f}")
         with k2:
             if cap is not None:
                 st.metric("Attainable Signal Captured",
                           f"{cap['above_chance']*100:.0f}%",
-                          help="(model AUROC − 0.5) / (ceiling AUROC − 0.5)")
+                          help="(pooled model AUROC − 0.5) / (ceiling AUROC − 0.5); "
+                               "capped at 100%.")
             else:
                 st.metric("Precision@Top-10% Ceiling",
                           f"{c['precision_at_top10pct']:.2f}")
@@ -232,13 +241,16 @@ def render() -> None:
             st.metric("Brier Ceiling (lowest)", f"{c['brier']:.3f}")
         msg = (f"Of {c['n_wells']} wells, {c['n_true_failures']} are truly "
                f"failure-bound; {c['n_label_flips']} labels are flipped by noise. "
-               f"Those flips are unpredictable from data, which is why even a "
-               f"perfect model tops out near AUROC {c['auroc']:.2f} here — the "
-               f"model's {m_auroc:.3f} is the noise floor, not a defect."
+               f"Those flips are unpredictable from data, so even a perfect model tops "
+               f"out near AUROC {c['auroc']:.2f} here. The model's pooled OOF "
+               f"{m_auroc:.3f} (mean-of-folds {cv_mean:.2f} ± {cv_std:.2f} on {n_pos} "
+               f"events) sits just under that ceiling — at the noise floor, not a defect."
                if m_auroc else "Ceiling computed from the generator's known label process.")
-        if cap is not None and cap["above_chance"] >= 0.95:
-            st.success(msg + " The model captures essentially 100% of the "
-                             "attainable ranking signal.")
+        if cap is not None:
+            st.info(msg + f" It captures ~{cap['above_chance']*100:.0f}% of the "
+                          "attainable above-chance ranking signal — statistically "
+                          "indistinguishable from the ceiling within sampling error on "
+                          f"{n_pos} events (not a literal 100%).")
         else:
             st.info(msg)
         theme.source_note(
