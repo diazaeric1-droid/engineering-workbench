@@ -25,11 +25,22 @@ if str(HERE) not in sys.path:
 # reload from the CURRENT commit's source. Streamlit re-runs this whole script on
 # EVERY interaction, so gate the heal to ONCE per session — re-running rmtree on
 # every rerun just defeats bytecode caching for no benefit (audit: infra perf).
-if not st.session_state.get("_workbench_healed"):
+if "pytest" not in sys.modules and not st.session_state.get("_workbench_healed"):
     import shutil as _sh_heal
-    _sh_heal.rmtree(HERE / "__pycache__", ignore_errors=True)
-    for _stale in ("theme", "fleet_registry", "product_theme"):
-        sys.modules.pop(_stale, None)
+    # 1) drop ALL stale bytecode under the app (top-level AND views/ and any package
+    #    dirs) — a single HERE/__pycache__ rmtree left views/__pycache__ behind.
+    for _pyc in HERE.rglob("__pycache__"):
+        _sh_heal.rmtree(_pyc, ignore_errors=True)
+    # 2) evict EVERY first-party module cached in the warm container, not just the three
+    #    top-level shared ones. A redeploy reuses the process, so a stale `views._common`
+    #    (or any view) from the previous commit keeps serving an OLD module that lacks
+    #    symbols added since — e.g. `vc.well_choices_for` → AttributeError at import use.
+    #    The imports below then reload every one of them from THIS commit's source.
+    _OWN = ("core", "product_theme", "theme", "fleet_registry",
+            "wps", "pec", "esp", "gla", "views", "src")
+    for _name in list(sys.modules):
+        if any(_name == p or _name.startswith(p + ".") for p in _OWN):
+            sys.modules.pop(_name, None)
     st.session_state["_workbench_healed"] = True
 
 import product_theme as pt  # noqa: E402

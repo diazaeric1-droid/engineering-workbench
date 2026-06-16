@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.1 — 2026-06-15
+
+### Fixed
+- **Warm-container module self-heal hardened.** Streamlit Cloud reuses the Python
+  process across redeploys, so a cached OLD copy of one of our modules can lack
+  symbols added in a newer commit → `AttributeError` at run. The once-per-session
+  self-heal now evicts **every** product-owned module — the component aliases
+  (`wps`, `pec`, `esp`, `gla`) and `src.*` in addition to `core`, `product_theme`,
+  `theme`, `fleet_registry`, and `views.*` — so imports and view pages reload from
+  the current commit. Skipped under pytest (modules already fresh) to preserve the
+  cross-test module-identity invariants.
+
 ## v0.3.0 — 2026-06-14
 
 Deep senior-PE hardening: the **Design section now anchors to the selected well**,
