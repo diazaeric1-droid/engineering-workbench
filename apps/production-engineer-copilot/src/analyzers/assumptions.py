@@ -34,9 +34,12 @@ DISCOUNT_RATE = 0.10                  # Standard 10% corporate hurdle for upstre
 # deferred_days : well downtime for the job (deferred production cost)
 # Uplift medians recalibrated down (PE review #17): the prior values implied 7-30x risked
 # return multiples and ~2-month payouts on routine work, which a domain reviewer reads as
-# fantasy. These are conservative central INITIAL incremental rates that land risked PI in a
-# believable ~1.5-4x band; the uplift also declines fast (uplift_decline) so it is not a
-# permanent rate add. Tune per well/operator before AFE.
+# fantasy. These are conservative central INITIAL incremental rates; the uplift also declines
+# fast (uplift_decline) so it is not a permanent rate add. The resulting risked profitability
+# indices land in a defensible range — roughly 2-4x for the larger-capital jobs (acid, ESP
+# swap, ESP->beam) and higher for cheap surface jobs (paraffin, pump-off controller, gas-lift
+# tuning) where a small spend genuinely pencils, which is realistic. Tune per well/operator
+# before AFE.
 INTERVENTION_DEFAULTS = {
     # Matrix/diverted acid: response varies widely; ~60-75% of wells respond meaningfully.
     "acid_stimulation":        {"cost_usd": 165_000, "uplift_bopd": 50, "uplift_decline": 0.80, "p_success": 0.70, "deferred_days": 3},

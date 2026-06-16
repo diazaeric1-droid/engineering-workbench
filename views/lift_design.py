@@ -305,10 +305,18 @@ def render() -> None:
             figp.add_vline(x=esp.q_bep_at_freq_bpd,
                            line=dict(color=theme.GREEN, dash="dash"),
                            annotation_text="BEP", annotation_position="bottom")
-        figp.add_scatter(x=[esp.total_fluid_bpd], y=[esp.head_per_stage_ft],
-                         name="Design point", mode="markers",
-                         marker=dict(size=12, color=theme.GREEN, symbol="x",
-                                     line=dict(width=2)))
+        # Only place a confident design point when the sizing is meaningful — under an
+        # inflow-limited / above-runout design the KPIs are blanked, so a green "Design
+        # point" marker would contradict them (PE review follow-up).
+        if sizing_ok:
+            figp.add_scatter(x=[esp.total_fluid_bpd], y=[esp.head_per_stage_ft],
+                             name="Design point", mode="markers",
+                             marker=dict(size=12, color=theme.GREEN, symbol="x",
+                                         line=dict(width=2)))
+        else:
+            figp.add_annotation(text="design not sized — inflow-limited / above runout",
+                                xref="paper", yref="paper", x=0.5, y=0.5,
+                                showarrow=False, font=dict(color=theme.GREY))
         figp.update_layout(title="ESP Pump Curve (Representative)",
                            xaxis_title="Total fluid (bpd)",
                            yaxis_title="Head per stage (ft)")

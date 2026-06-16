@@ -110,11 +110,16 @@ def screen_well(path: str) -> PortfolioRow:
     return screen_wellfile(WellFile.from_json(path))
 
 
-def screen_wellfile(well: WellFile) -> PortfolioRow:
+def screen_wellfile(well: WellFile, realized_price_per_bbl: float | None = None) -> PortfolioRow:
     """Deterministic screen of an in-memory ``WellFile`` (synthetic OR real adapter output).
 
     Identical logic to ``screen_well`` — extracted so adapter-built wells (e.g. NDIC
     monthly fleet) get the SAME diagnosis + risked economics without a JSON round-trip.
+
+    ``realized_price_per_bbl`` lets a caller (e.g. the AI Well Review at a live price deck)
+    drive the risked NPV off the same price its other panels use, so the headline number
+    cannot silently diverge from a deck-responsive Monte-Carlo. ``None`` keeps the calibrated
+    default (REALIZED_PRICE_USD_PER_BBL) — preserving the CLI / portfolio-ranking behaviour.
     """
     intervention, diagnosis = _indicated_intervention(well)
     oil = np.array([r.get("oil_bopd", 0) for r in well.production_history], float)
@@ -134,11 +139,13 @@ def screen_wellfile(well: WellFile) -> PortfolioRow:
 
     d = A.intervention_defaults(intervention) or {"cost_usd": 150_000, "uplift_bopd": 80,
                                                   "uplift_decline": 0.6, "p_success": 0.8, "deferred_days": 3}
+    _price_kw = ({} if realized_price_per_bbl is None
+                 else {"realized_price_per_bbl": float(realized_price_per_bbl)})
     econ = evaluate_intervention(
         name=intervention, treatment_cost_usd=d["cost_usd"], incremental_rate_bopd=d["uplift_bopd"],
         uplift_decline_per_yr=d["uplift_decline"], prob_success=d["p_success"],
         deferred_days=d["deferred_days"], base_rate_bopd=last_oil,
-        water_cut_pct=wc, water_disposal_per_bbl=A.SWD_USD_PER_BBL_WATER)
+        water_cut_pct=wc, water_disposal_per_bbl=A.SWD_USD_PER_BBL_WATER, **_price_kw)
     payout = econ.payout_months if np.isfinite(econ.payout_months) else None
     return PortfolioRow(well.well_id, well.artificial_lift.get("type", ""), diagnosis,
                         intervention, round(econ.npv_10pct_usd), payout,

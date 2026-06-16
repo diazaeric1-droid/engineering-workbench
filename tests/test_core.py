@@ -391,6 +391,28 @@ def test_simulate_intervention_ordered_deterministic_with_tornado():
     assert risky["npv_p90_usd"] <= det.npv_10pct_usd <= risky["npv_p10_usd"]
 
 
+def test_screen_wellfile_risked_npv_tracks_realized_price():
+    """PE review #19/#16: the AI Review headline 'Risked NPV' (screen_wellfile) must respond
+    to the live price deck so it can't show a different, stale number than the deck-driven
+    Monte-Carlo panel. Default (None) stays pinned to the calibrated realized price for the
+    CLI / portfolio ranking (backward compatible)."""
+    import glob
+    econ_well = None
+    for p in sorted(glob.glob(str(core.PEC_SYNTH_DIR / "well_*.json"))):
+        wf = core.pec_portfolio.WellFile.from_json(p)
+        r = core.pec_portfolio.screen_wellfile(wf)
+        if r.intervention not in core.pec_portfolio._NON_ECONOMIC and r.npv_usd:
+            econ_well = wf
+            break
+    assert econ_well is not None, "need at least one well with an economic intervention"
+    base = core.pec_portfolio.screen_wellfile(econ_well)
+    pinned = core.pec_portfolio.screen_wellfile(
+        econ_well, realized_price_per_bbl=core.pec_assumptions.REALIZED_PRICE_USD_PER_BBL)
+    high = core.pec_portfolio.screen_wellfile(econ_well, realized_price_per_bbl=85.0)
+    assert base.npv_usd == pinned.npv_usd          # None == calibrated default (compat)
+    assert high.npv_usd > base.npv_usd             # tracks the deck price
+
+
 # ---------------------------------------------------------------- survival metrics pin
 def test_survival_metrics_beat_km_baseline():
     """Run-Life headline numbers: out-of-fold C-index orders better than chance and the

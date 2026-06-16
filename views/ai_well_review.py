@@ -50,10 +50,14 @@ def _probabilistic_econ_panel(row) -> None:
         realized_price_per_bbl=realized, discount_rate=discount, opex_per_bbl=opex)
     try:
         sim = core.pec_economics.simulate_intervention(prob_success=p_succ, seed=42, **common)
-        det = core.pec_economics.evaluate_intervention(prob_success=p_succ, **common)
     except Exception:  # noqa: BLE001
         return
-    det_npv = float(det.npv_10pct_usd)
+    # Overlay the HEADLINE risked NPV (the same row.npv_usd shown in the KPI above, now
+    # driven by this deck's realized price) so the panel and header never show two different
+    # "Risked NPV" numbers. It additionally nets deferred-production + water-disposal drag
+    # that the rate/decline/price/COS MC simplifies, so it can sit slightly left of the
+    # MC median — captioned below. (PE review #16)
+    det_npv = float(row.npv_usd)
 
     pt.section("Probabilistic Intervention Economics (Monte-Carlo)",
                "10,000 trials over uncertain incremental rate (±lognormal), uplift decline, "
@@ -80,7 +84,7 @@ def _probabilistic_econ_panel(row) -> None:
         hfig.add_vline(x=0, line=dict(color=theme.RED, width=1, dash="dot"))
         hfig.add_vline(x=det_npv / 1e6,
                        line=dict(color=theme.GREEN, width=2, dash="dash"),
-                       annotation_text="Risked NPV (det.)", annotation_position="top")
+                       annotation_text="Headline risked NPV", annotation_position="top")
         hfig.update_layout(title="NPV Distribution (10k trials, COS-risked)",
                            xaxis_title="NPV ($MM)", yaxis_title="Trials", showlegend=False)
         st.plotly_chart(theme.style_fig(hfig, height=300, legend=False), width="stretch")
@@ -109,9 +113,11 @@ def _probabilistic_econ_panel(row) -> None:
         f"(${oil_price:,.0f} WTI {core.pec_assumptions.REALIZED_DIFFERENTIAL:+.0f} basis) · "
         f"{discount:.0%} discount · ${opex:,.0f}/bbl LOE · {p_succ:.0%} chance-of-success. "
         f"Each trial draws Bernoulli({p_succ:.2f}); a miss zeros the uplift and books −cost, "
-        "so P(payout)/P(loss) are honest and the distribution is consistent with the risked "
-        "point NPV (green line = deterministic risked NPV; the green spike at −cost is the "
-        "miss mass). Tornado spans the success-case input swings. Seed 42; no LLM, no key.")
+        "so P(payout)/P(loss) are honest. The green line is the **headline Risked NPV** from "
+        "the KPI above (same realized price); it additionally nets deferred-production + "
+        "water-disposal drag the rate/decline/price/COS MC simplifies, so it can sit a little "
+        "left of the MC median. The spike at −cost is the miss mass. Tornado spans the "
+        "success-case input swings. Seed 42; no LLM, no key.")
 
 
 def _holdout_agreement() -> float:
@@ -168,8 +174,13 @@ def render() -> None:
     pt.section("Deterministic Screen (No Key Required)",
                "The same analyzers the agent calls as tools — Arps fit, water/gas "
                "trends, ESP POR check, risked NPV — run here directly.")
+    # Drive the risked NPV off the SAME realized price the probabilistic panel uses (deck
+    # WTI + basis differential) so the headline and the MC can't show two different
+    # "Risked NPV" values, and so the header reacts to the price slider (PE review #19/#16).
+    _oilp, _nri, _disc = _common.deck()
+    _realized = float(_oilp) + float(core.pec_assumptions.REALIZED_DIFFERENTIAL)
     try:
-        row = core.pec_portfolio.screen_wellfile(well)
+        row = core.pec_portfolio.screen_wellfile(well, realized_price_per_bbl=_realized)
     except Exception as exc:  # noqa: BLE001
         row = None
         st.warning(f"Portfolio screen unavailable for this well: {exc}")

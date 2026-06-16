@@ -194,11 +194,10 @@ def render() -> None:
             # EUR reconciliation (audit): the prodpy EUR percentiles integrate the FULL
             # forecast horizon, but the fan is shown only to the economic limit — so a PE
             # reading "P50 EUR" off a fan that stops at the econ limit would mis-read it.
-            # Show BOTH, clearly labeled: the reserves-style EUR-to-economic-limit on the
-            # P50 path (history cum + ∫P50 over the displayed-to-econ-limit fan), and the
-            # full-horizon percentile EURs.
-            econ_fc_cum = float(_trapezoid(np.asarray(fb.p50_rate, float),
-                                           np.asarray(fb.days, float)))
+            # Integrate the SAME masked P50 the plot draws (fd/p50, from last observed day
+            # forward) so the "displayed fan" EUR matches the chart even on a shut-in-tail
+            # well — not the full fb.days, which includes points the plot hides.
+            econ_fc_cum = float(_trapezoid(p50, fd)) if len(fd) > 1 else 0.0
             eur_p50_disp = fb.cum_history_bbl + max(econ_fc_cum, 0.0)
             st.metric("EUR P50 — displayed fan",
                       f"{eur_p50_disp/1000:,.0f} MBO",
@@ -222,12 +221,13 @@ def render() -> None:
             ])
             st.caption(
                 f"History cum ≈ {fb.cum_history_bbl/1000:,.0f} MBO. The displayed-fan EUR "
-                "above and the full-horizon P50 here both integrate the P50 path to the "
-                "5-yr horizon, so they are close — neither is a true to-abandonment "
-                "reserves number (extend the horizon for that). The P90/P10 spread is the "
-                "qi/di fit-parameter band, not an SPE-PRMS reserves range. History cum is "
-                "a trapezoidal integral of the reported monthly stream — on a gappy/"
-                "shut-in tail treat it as approximate.")
+                "above integrates the P50 over the rate fan as drawn (to the 5-yr horizon, "
+                "or the econ limit if the P50 reaches it first); the full-horizon P50 here "
+                "always runs the full 5 yr — so they're close but not identical. Neither is "
+                "a true to-abandonment reserves number (extend the horizon for that). The "
+                "P90/P10 spread is the qi/di fit-parameter band, not an SPE-PRMS reserves "
+                "range. History cum is a trapezoidal integral of the reported monthly "
+                "stream — on a gappy/shut-in tail treat it as approximate.")
 
             oil_price, nri, discount = _common.deck()
             try:

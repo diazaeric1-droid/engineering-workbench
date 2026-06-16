@@ -68,10 +68,14 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Fleet allocation")
+    # The 20-well demo fleet draws ~22,000-25,000 Mscf/d total at its optima, so the cap
+    # range/default must live at that scale — a 1-60 Mscf/d slider funded only 1 well and
+    # showed a dishonest large-negative reallocation headline (PE review).
     comp_cap = st.slider(
         "Compressor capacity (Mscfd total)",
-        1.0, 60.0, 20.0, 1.0,
-        help="Total gas available for injection across the fleet.",
+        2000.0, 40000.0, 24000.0, 500.0,
+        help="Total gas available for injection across the fleet (~22-25 MMscf/d covers "
+             "the demo fleet's unconstrained demand).",
     )
 
 # ---- constants --------------------------------------------------------------
@@ -243,8 +247,9 @@ with tab1:
     c4.metric("At Optimum", f"{n_opt}")
 
     theme.source_note(
-        "Daily value at stake = net revenue at recommended injection − net revenue at current injection "
-        "(oil_price × NRI − gas_cost; downside-clipped to 0 for fleet total). "
+        "Daily value at stake = lift-gas margin at recommended injection − lift-gas margin at "
+        "current injection (oil revenue net of injection-gas cost only — excludes LOE / "
+        "compression / water disposal; downside-clipped to 0 for fleet total). "
         "Source: Brown (1984); Takács (2005)."
     )
 
@@ -397,7 +402,7 @@ with tab2:
         fig_econ = go.Figure()
         fig_econ.add_trace(go.Scatter(
             x=q_range, y=net_rev_curve,
-            mode="lines", name="Net revenue/day",
+            mode="lines", name="Oil revenue − lift-gas cost",
             line=dict(color=theme.BLUE, width=2),
             fill="tozeroy", fillcolor=f"rgba(79,129,189,0.08)",
         ))
@@ -413,12 +418,16 @@ with tab2:
         ))
         fig_econ.add_hline(y=0, line=dict(color=theme.RED, width=1, dash="dot"))
         fig_econ.update_layout(
-            title="Net Revenue vs. Injection Rate",
+            title="Oil Revenue (Net Of Lift-Gas) vs. Injection Rate",
             xaxis_title="Injection gas (Mscfd)",
-            yaxis_title="Net revenue ($/day)",
+            yaxis_title="Oil revenue − lift-gas cost ($/day)",
         )
         st.plotly_chart(theme.style_fig(fig_econ, height=340), use_container_width=True)
-        theme.source_note("Net revenue = BOPD × (1 − WC) × price × NRI − Qinj × gas_cost")
+        theme.source_note(
+            "Objective = BOPD × (1 − WC) × price × NRI − Qinj × gas_cost — oil revenue net "
+            "of injection-gas cost only (the lift-gas margin used to locate the optimum). It "
+            "excludes LOE, compression opex, and water disposal, so it is NOT a full net "
+            "revenue.")
 
     # Recommendation card
     daily_gain = opt_w.net_revenue_per_day - cur_rev
@@ -431,10 +440,10 @@ with tab2:
         f"""
         <div style="background:{rec_bg}15; border-left:4px solid {rec_bg};
                     border-radius:8px; padding:1rem 1.2rem; margin-bottom:0.8rem;">
-        <b style="font-size:1.05rem">{direction} injection: {cur_inj_w:.2f} → {opt_w.q_inj_opt:.2f} Mscfd</b>
+        <b style="font-size:1.05rem">{direction} injection: {cur_inj_w:,.0f} → {opt_w.q_inj_opt:,.0f} Mscfd</b>
         <br><br>
         Expected result: <b>{opt_w.q_oil_opt:.0f} BOPD</b> (from {float(glpc_rate(cur_inj_w, params_w))*(1-wc_w):.0f} BOPD) &nbsp;|&nbsp;
-        Daily net revenue: <b>${opt_w.net_revenue_per_day:,.0f}/day</b> (from ${cur_rev:,.0f}/day) &nbsp;|&nbsp;
+        Daily lift-gas margin: <b>${opt_w.net_revenue_per_day:,.0f}/day</b> (from ${cur_rev:,.0f}/day) &nbsp;|&nbsp;
         Daily gain: <b>${daily_gain:,.0f}/day</b> · <b>${daily_gain*365/1e6:.2f}MM/year</b>
         </div>
         """,

@@ -136,9 +136,13 @@ def render() -> None:
                        "How the shipped classifier scores on held-out folds — the "
                        "numbers behind the risk table, not a training-set echo.")
             pt.kpi_row([
-                {"label": "OOF AUROC", "value": f"{tr['auroc_cv_mean']:.3f}",
+                {"label": "OOF AUROC (mean-of-folds)", "value": f"{tr['auroc_cv_mean']:.3f}",
                  "delta": f"±{tr['auroc_cv_std']:.3f} across folds",
-                 "delta_color": "off"},
+                 "delta_color": "off",
+                 "help": "Mean of the per-fold out-of-fold AUROCs (wide on few positives). "
+                         "The Oracle Ceiling panel below uses the POOLED OOF AUROC "
+                         f"({tr.get('auroc_oof_pooled', float('nan')):.3f}) — the "
+                         "ceiling-comparable number; they differ by design."},
                 {"label": "Precision @ Top 10%",
                  "value": f"{tr['precision_at_top10pct']:.0%}",
                  "help": "Of the top-decile risk calls, the share that truly failed"},
